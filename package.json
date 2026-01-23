@@ -18,8 +18,7 @@
     "webpack": "^5.91.0",
     "webpack-cli": "^5.1.4",
     "webpack-dev-server": "^4.13.0"
-  }
-,
+  },
   "overrides": {
     "rimraf": "^4.0.1",
     "glob": "^10.0.0"

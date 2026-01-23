@@ -21,6 +21,7 @@ export class PlayerModel {
   constructor(scene: Scene, obstacles: ObstacleModel[]) {
     this.obstacles = obstacles;
     this.mesh = MeshBuilder.CreateBox("PlayerCube", { size: 1 }, scene);
+    this.mesh.renderingGroupId = 1;
     this.mesh.position.y = 0.5;
     const material = new StandardMaterial("playerMat", scene);
     material.diffuseColor = new Color3(0.2, 0.6, 1);
@@ -28,8 +29,11 @@ export class PlayerModel {
   }
 
   setTarget(point: Vector3) {
-    this.target = point.clone();
-    this.target.y = this.mesh.position.y;
+    const snappedPoint = point.clone();
+    snappedPoint.x = Math.round(snappedPoint.x);
+    snappedPoint.z = Math.round(snappedPoint.z);
+    snappedPoint.y = this.mesh.position.y;
+    this.target = snappedPoint;
     this.pathPoints = this.buildPath(this.mesh.position.clone(), this.target);
     this.currentSegmentIndex = 1;
     this.target = this.pathPoints[this.pathPoints.length - 1].clone();

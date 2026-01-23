@@ -7,7 +7,8 @@ import {
   StandardMaterial,
   Color3,
   HemisphericLight,
-  PointerEventTypes
+  PointerEventTypes,
+  LinesMesh
 } from "babylonjs";
 import { ObstacleModel } from "./models/ObstacleModel";
 import { PlayerModel } from "./models/PlayerModel";
@@ -31,6 +32,30 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
   groundMaterial.diffuseColor = Color3.White();
   groundMaterial.specularColor = new Color3(0.1, 0.1, 0.1);
   ground.material = groundMaterial;
+  const gridExtent = 2500;
+  const gridSquareSize = 1;
+  const gridSquareOffset = gridSquareSize / 2;
+  const gridLines: Vector3[][] = [];
+  for (let i = -gridExtent; i <= gridExtent; i += gridSquareSize) {
+    gridLines.push([
+      new Vector3(i + gridSquareOffset, 0.01, -gridExtent + gridSquareOffset),
+      new Vector3(i + gridSquareOffset, 0.01, gridExtent + gridSquareOffset)
+    ]);
+  }
+  for (let i = -gridExtent; i <= gridExtent; i += gridSquareSize) {
+    gridLines.push([
+      new Vector3(-gridExtent + gridSquareOffset, 0.01, i + gridSquareOffset),
+      new Vector3(gridExtent + gridSquareOffset, 0.01, i + gridSquareOffset)
+    ]);
+  }
+  const gridOverlay = MeshBuilder.CreateLineSystem(
+    "gridOverlay",
+    { lines: gridLines, updatable: false },
+    scene
+  ) as LinesMesh;
+  gridOverlay.color = new Color3(0.75, 0.75, 0.75);
+  gridOverlay.isPickable = false;
+  gridOverlay.renderingGroupId = 0;
 
   const obstacles = [
     new ObstacleModel(scene, new Vector3(3, 0, 3)),

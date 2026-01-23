@@ -7,6 +7,7 @@ export class ObstacleModel {
     this.mesh = MeshBuilder.CreateBox("Obstacle", { size }, scene);
     this.mesh.position = position.clone();
     this.mesh.position.y = size / 2;
+    this.mesh.renderingGroupId = 1;
     const material = new StandardMaterial("obstacleMat", scene);
     material.diffuseColor = new Color3(0.8, 0.2, 0.2);
     this.mesh.material = material;
