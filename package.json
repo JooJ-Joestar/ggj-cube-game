@@ -1,0 +1,27 @@
+{
+  "name": "ggj-cube-game",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Minimal Babylon.js strategy-style cube controller demo for GDJ",
+  "scripts": {
+    "start": "webpack serve --mode development --open --hot",
+    "build": "webpack --mode production"
+  },
+  "dependencies": {
+    "babylonjs": "^8.26.0"
+  },
+  "devDependencies": {
+    "html-webpack-plugin": "^5.5.0",
+    "ts-loader": "^9.4.0",
+    "typescript": "^5.5.0",
+    "@types/webpack-env": "^1.17.4",
+    "webpack": "^5.91.0",
+    "webpack-cli": "^5.1.4",
+    "webpack-dev-server": "^4.13.0"
+  }
+,
+  "overrides": {
+    "rimraf": "^4.0.1",
+    "glob": "^10.0.0"
+  }
+}

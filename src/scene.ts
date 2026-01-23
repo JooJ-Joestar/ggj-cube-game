@@ -1,0 +1,60 @@
+import {
+  Engine,
+  Scene,
+  ArcRotateCamera,
+  Vector3,
+  MeshBuilder,
+  StandardMaterial,
+  Color3,
+  HemisphericLight,
+  PointerEventTypes
+} from "babylonjs";
+import { ObstacleModel } from "./models/ObstacleModel";
+import { PlayerModel } from "./models/PlayerModel";
+
+export function createScene(canvas: HTMLCanvasElement): Scene {
+  const engine = new Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true });
+  const scene = new Scene(engine);
+
+  const camera = new ArcRotateCamera("camera", Math.PI / 4, Math.PI / 3, 18, Vector3.Zero(), scene);
+  camera.attachControl(canvas, true);
+
+  const light = new HemisphericLight("hemisphericLight", new Vector3(0, 1, 0), scene);
+  light.intensity = 0.95;
+
+  const ground = MeshBuilder.CreateGround(
+    "ground",
+    { width: 6000, height: 6000, subdivisions: 2 },
+    scene
+  );
+  const groundMaterial = new StandardMaterial("groundMat", scene);
+  groundMaterial.diffuseColor = Color3.White();
+  groundMaterial.specularColor = new Color3(0.1, 0.1, 0.1);
+  ground.material = groundMaterial;
+
+  const obstacles = [
+    new ObstacleModel(scene, new Vector3(3, 0, 3)),
+    new ObstacleModel(scene, new Vector3(-4, 0, -1))
+  ];
+
+  const player = new PlayerModel(scene, obstacles);
+
+  scene.onPointerObservable.add((pointerInfo) => {
+    if (pointerInfo.type === PointerEventTypes.POINTERDOWN) {
+      const pick = scene.pick(scene.pointerX, scene.pointerY, (mesh) => mesh === ground);
+      if (pick && pick.hit && pick.pickedPoint) {
+        player.setTarget(pick.pickedPoint);
+      }
+    }
+  });
+
+  engine.runRenderLoop(() => {
+    const deltaSeconds = engine.getDeltaTime() / 1000;
+    player.update(deltaSeconds);
+    scene.render();
+  });
+
+  window.addEventListener("resize", () => engine.resize());
+
+  return scene;
+}
