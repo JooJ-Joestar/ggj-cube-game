@@ -8,7 +8,8 @@
     "build": "webpack --mode production"
   },
   "dependencies": {
-    "babylonjs": "^8.26.0"
+    "babylonjs": "^8.26.0",
+    "babylonjs-gui": "^8.26.0"
   },
   "devDependencies": {
     "html-webpack-plugin": "^5.5.0",

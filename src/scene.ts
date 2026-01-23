@@ -12,6 +12,7 @@ import {
 } from "babylonjs";
 import { ObstacleModel } from "./models/ObstacleModel";
 import { PlayerModel } from "./models/PlayerModel";
+import { GameUI, PlayerMode } from "./ui";
 
 export function createScene(canvas: HTMLCanvasElement): Scene {
   const engine = new Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true });
@@ -57,18 +58,33 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
   gridOverlay.isPickable = false;
   gridOverlay.renderingGroupId = 0;
 
-  const obstacles = [
-    new ObstacleModel(scene, new Vector3(3, 0, 3)),
-    new ObstacleModel(scene, new Vector3(-4, 0, -1))
-  ];
+  const obstacles: ObstacleModel[] = [];
+  obstacles.push(new ObstacleModel(scene, new Vector3(3, 0, 3)));
+  obstacles.push(new ObstacleModel(scene, new Vector3(-4, 0, -1)));
 
   const player = new PlayerModel(scene, obstacles);
+  const ui = new GameUI(scene);
+  let currentMode: PlayerMode = ui.getMode();
+  ui.onModeChange = (mode) => {
+    currentMode = mode;
+  };
 
   scene.onPointerObservable.add((pointerInfo) => {
     if (pointerInfo.type === PointerEventTypes.POINTERDOWN) {
       const pick = scene.pick(scene.pointerX, scene.pointerY, (mesh) => mesh === ground);
       if (pick && pick.hit && pick.pickedPoint) {
-        player.setTarget(pick.pickedPoint);
+        const snapped = new Vector3(
+          Math.round(pick.pickedPoint.x),
+          0,
+          Math.round(pick.pickedPoint.z)
+        );
+        if (currentMode === "move") {
+          player.setTarget(snapped);
+        } else {
+          player.setTarget(snapped);
+          const selectedColor = ui.getSelectedColor();
+          new ObstacleModel(scene, snapped, 1, selectedColor);
+        }
       }
     }
   });
