@@ -102,6 +102,7 @@ export class PlayerModel {
         obstacle.mesh.getBoundingInfo().boundingBox.extendSize.length();
       const avoidanceDistance = clearance + obstacleRadius + 0.25;
       const waypoint = obstaclePos.add(perp.scale(avoidanceDistance));
+      waypoint.y = start.y;
       path.push(waypoint);
     }
 
