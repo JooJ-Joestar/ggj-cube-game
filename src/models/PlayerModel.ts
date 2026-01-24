@@ -13,10 +13,11 @@ export class PlayerModel {
   readonly mesh: Mesh;
   private target: Vector3 | null = null;
   private readonly obstacles: ObstacleModel[];
-  private readonly maxSpeed = 5; // units per second
+  private readonly maxSpeed = 15; // units per second
   private pathLine: LinesMesh | null = null;
   private pathPoints: Vector3[] = [];
   private currentSegmentIndex = 0;
+  private destinationCallback: ((position: Vector3) => void) | null = null;
 
   constructor(scene: Scene, obstacles: ObstacleModel[]) {
     this.obstacles = obstacles;
@@ -40,6 +41,10 @@ export class PlayerModel {
     this.showPath(this.pathPoints);
   }
 
+  setDestinationCallback(callback: (position: Vector3) => void) {
+    this.destinationCallback = callback;
+  }
+
   update(deltaSeconds: number) {
     if (this.pathPoints.length === 0 || this.currentSegmentIndex >= this.pathPoints.length) {
       return;
@@ -53,6 +58,7 @@ export class PlayerModel {
       if (this.currentSegmentIndex >= this.pathPoints.length) {
         this.clearPathLine();
         this.target = null;
+        this.destinationCallback?.(this.mesh.position.clone());
       }
       return;
     }
