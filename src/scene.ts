@@ -14,6 +14,7 @@ import { ObstacleModel } from "./models/ObstacleModel";
 import { PlayerModel } from "./models/PlayerModel";
 import { ColorCube } from "./models/ColorCube";
 import { GameUI, PlayerMode } from "./ui";
+import { colyseusConnection } from "./connection";
 
 export function createScene(canvas: HTMLCanvasElement): Scene {
   const engine = new Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true });
@@ -125,5 +126,6 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
 
   window.addEventListener("resize", () => engine.resize());
 
+  colyseusConnection.connect();
   return scene;
 }

@@ -8,12 +8,13 @@ import {
   LinesMesh
 } from "babylonjs";
 import { ObstacleModel } from "./ObstacleModel";
+import { colyseusConnection } from "../connection";
 
 export class PlayerModel {
   readonly mesh: Mesh;
   private target: Vector3 | null = null;
   private readonly obstacles: ObstacleModel[];
-  private readonly maxSpeed = 15; // units per second
+  private readonly maxSpeed = 3; // units per second
   private pathLine: LinesMesh | null = null;
   private pathPoints: Vector3[] = [];
   private currentSegmentIndex = 0;
@@ -46,6 +47,9 @@ export class PlayerModel {
   }
 
   update(deltaSeconds: number) {
+    if (colyseusConnection.shouldPauseUpdates()) {
+      return;
+    }
     if (this.pathPoints.length === 0 || this.currentSegmentIndex >= this.pathPoints.length) {
       return;
     }

@@ -9,9 +9,11 @@
   },
   "dependencies": {
     "babylonjs": "^8.26.0",
-    "babylonjs-gui": "^8.26.0"
+    "babylonjs-gui": "^8.26.0",
+    "colyseus.js": "0.16.19"
   },
   "devDependencies": {
+    "dotenv-webpack": "^8.0.1",
     "html-webpack-plugin": "^5.5.0",
     "ts-loader": "^9.4.0",
     "typescript": "^5.5.0",
