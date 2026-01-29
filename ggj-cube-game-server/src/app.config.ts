@@ -40,6 +40,7 @@ export default config({
          * Read more: https://docs.colyseus.io/tools/monitor/#restrict-access-to-the-panel-using-a-password
          */
         app.use("/monitor", monitor());
+        app.use("/colyseus", monitor());
     },
 
 

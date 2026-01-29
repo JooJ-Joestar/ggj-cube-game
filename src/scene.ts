@@ -67,7 +67,7 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
   const player = new PlayerModel(scene, obstacles);
   camera.setTarget(player.mesh.position);
   const cameraOffset = camera.position.subtract(player.mesh.position);
-  const ui = new GameUI(scene);
+  const ui = new GameUI(scene, colyseusConnection);
   const placedCubes = new Map<string, ColorCube>();
   let pendingPlacement: { position: Vector3; color: Color3 } | null = null;
   const gridKey = (position: Vector3) => `${position.x},${position.z}`;
@@ -120,6 +120,7 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
     const deltaSeconds = engine.getDeltaTime() / 1000;
     camera.setTarget(player.mesh.position);
     player.update(deltaSeconds);
+    ui.updateDebugInfo();
     camera.position = player.mesh.position.add(cameraOffset);
     scene.render();
   });

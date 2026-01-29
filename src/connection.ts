@@ -1,9 +1,14 @@
-import { Client } from "colyseus.js";
+import { Client, Room } from "colyseus.js";
+
+type RoomWithClients<State = unknown> = Room<State> & {
+  clients?: number;
+};
 
 const DEFAULT_URL = "ws://localhost:2567";
 
 export class ColyseusConnection {
   private client: Client | null = null;
+  private room: RoomWithClients | null = null;
   private readonly serverUrl: string;
   private connected = false;
   private disconnectedAt: number | null = null;
@@ -12,42 +17,60 @@ export class ColyseusConnection {
     this.serverUrl = process.env.COLYSEUS_URL || DEFAULT_URL;
   }
 
-  connect() {
-    if (this.client) {
-      return this.client;
+  async connect() {
+    if (this.client && this.room) {
+      return this.room;
     }
 
     this.client = new Client(this.serverUrl);
     console.info("Connecting to Colyseus server", this.serverUrl);
 
-    this.hookEvents();
-    return this.client;
+    this.hookClientEvents();
+
+    try {
+      const room = (await this.client.joinOrCreate("my_room")) as RoomWithClients;
+      this.room = room;
+      this.connected = true;
+      this.disconnectedAt = null;
+      this.hookRoomEvents(room);
+      console.info("Joined room", room.roomId);
+      return room;
+    } catch (err) {
+      console.warn("Couldn't connect to room", err);
+      this.client = null;
+      return null;
+    }
   }
 
-  private hookEvents() {
-    if (!this.client) {
-      return;
-    }
-
+  private hookClientEvents() {
+    if (!this.client) return;
     const anyClient = this.client as any;
-
     anyClient.onOpen?.add?.(() => {
       this.connected = true;
       this.disconnectedAt = null;
-      console.info("Connected to Colyseus server", this.serverUrl);
+      console.info("Colyseus client connected", this.serverUrl);
     });
-
     anyClient.onError?.add?.((err: unknown) => {
       this.connected = false;
       this.disconnectedAt = Date.now();
-      console.warn("Colyseus connection error", err);
+      console.warn("Colyseus client error", err);
     });
-
     anyClient.onClose?.add?.(() => {
       this.connected = false;
       this.disconnectedAt = Date.now();
-      console.info("Colyseus connection closed");
+      console.info("Colyseus client closed");
       this.client = null;
+    });
+  }
+
+  private hookRoomEvents(room: RoomWithClients) {
+    room.onLeave(() => {
+      this.room = null;
+      this.disconnectedAt = Date.now();
+      this.connected = false;
+    });
+    room.onError((err) => {
+      console.warn("Room error", err);
     });
   }
 
@@ -65,6 +88,29 @@ export class ColyseusConnection {
 
   getClient() {
     return this.client;
+  }
+
+  getRoomName() {
+    return this.room?.name ?? "n/a";
+  }
+
+  getRoomId() {
+    return this.room?.roomId ?? "n/a";
+  }
+
+  getPlayerCount() {
+    return this.room?.clients ?? 0;
+  }
+
+  getLastLatency() {
+    if (!this.room) {
+      return 0;
+    }
+    const transport = (this.room as any).transport;
+    if (!transport?.latency) {
+      return 0;
+    }
+    return Math.round(transport.latency);
   }
 }
 

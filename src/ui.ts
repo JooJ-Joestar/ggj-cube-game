@@ -1,5 +1,14 @@
 import { Color3, Scene } from "babylonjs";
-import { AdvancedDynamicTexture, Button, StackPanel, Control, ColorPicker } from "babylonjs-gui";
+import {
+  AdvancedDynamicTexture,
+  Button,
+  StackPanel,
+  Control,
+  ColorPicker,
+  TextBlock,
+  Rectangle
+} from "babylonjs-gui";
+import { ColyseusConnection } from "./connection";
 
 export type PlayerMode = "move" | "place";
 
@@ -10,33 +19,40 @@ export class GameUI {
   private placeButton: Button;
   private colorButton: Button;
   private selectedColor = new Color3(1, 0.4, 0);
+  private debugInfoPanel!: StackPanel;
+  private roomInfoText!: TextBlock;
+  private playerCountText!: TextBlock;
+  private latencyText!: TextBlock;
   public onModeChange: (mode: PlayerMode) => void = () => {};
+  private readonly connection: ColyseusConnection;
 
-  constructor(scene: Scene) {
+  constructor(scene: Scene, connection: ColyseusConnection) {
     this.gui = AdvancedDynamicTexture.CreateFullscreenUI("game-ui", true, scene as any);
     this.gui.idealHeight = 720;
 
-    const stack = new StackPanel();
-    stack.width = "220px";
-    stack.isVertical = true;
-    stack.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_RIGHT;
-    stack.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-    stack.paddingTop = "16px";
-    stack.paddingRight = "16px";
-    stack.spacing = 8;
-    this.gui.addControl(stack);
+    const rightBtnsStack = new StackPanel();
+    rightBtnsStack.width = "180px";
+    rightBtnsStack.isVertical = true;
+    rightBtnsStack.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_RIGHT;
+    rightBtnsStack.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    rightBtnsStack.paddingTop = "16px";
+    rightBtnsStack.paddingRight = "16px";
+    rightBtnsStack.spacing = 8;
+    this.gui.addControl(rightBtnsStack);
 
+    this.connection = connection;
     this.moveButton = this.createButton("Move", () => this.setMode("move"));
     this.placeButton = this.createButton("Place", () => this.setMode("place"));
     this.colorButton = this.createButton("Color", () => this.openColorWheel());
     this.colorButton.isVisible = false;
 
-    stack.addControl(this.moveButton);
-    stack.addControl(this.placeButton);
-    stack.addControl(this.colorButton);
+    rightBtnsStack.addControl(this.moveButton);
+    rightBtnsStack.addControl(this.placeButton);
+    rightBtnsStack.addControl(this.colorButton);
 
     this.updateButtonStates();
     this.updateColorButton();
+    this.createDebugInfo();
   }
 
   getMode() {
@@ -122,5 +138,76 @@ export class GameUI {
     button.background = active ? "rgba(173, 216, 230, 0.7)" : "rgba(173, 216, 230, 0.4)";
     button.thickness = active ? 2 : 0;
     button.color = "white";
+  }
+
+  private createDebugInfo() {
+    const panelSize = "200px";
+    const fontFamily = "FreeMono";
+    const fontSize = 10;
+    const fontHeight = "10px";
+
+    const debugGroup = new StackPanel();
+    debugGroup.width = panelSize;
+    debugGroup.isVertical = true;
+    debugGroup.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+    debugGroup.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    debugGroup.spacing = 6;
+    debugGroup.zIndex = 10;
+    debugGroup.background = "rgba(0, 0, 0, 0.75)";
+    this.gui.addControl(debugGroup);
+
+    this.debugInfoPanel = new StackPanel();
+    this.debugInfoPanel.isVertical = true;
+    this.debugInfoPanel.width = panelSize;
+    this.debugInfoPanel.adaptHeightToChildren = true;
+    this.debugInfoPanel.adaptWidthToChildren = true;
+    this.debugInfoPanel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+    this.debugInfoPanel.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    this.debugInfoPanel.paddingTop = "4px";
+    this.debugInfoPanel.spacing = 4;
+    this.debugInfoPanel.paddingLeft = "8px";
+    this.debugInfoPanel.paddingRight = "8px";
+    this.debugInfoPanel.isPointerBlocker = false;
+
+    this.roomInfoText = new TextBlock("roomInfo", "Room: n/a (n/a)");
+    this.roomInfoText.fontSize = fontSize;
+    this.roomInfoText.fontFamily = fontFamily;
+    this.roomInfoText.height = fontHeight;
+    this.roomInfoText.width = "100%";
+    this.roomInfoText.color = "white";
+    this.roomInfoText.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+    this.roomInfoText.textVerticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
+    this.roomInfoText.isVisible = true;
+    this.debugInfoPanel.addControl(this.roomInfoText);
+
+    this.playerCountText = new TextBlock("playerCount", "Players: 0");
+    this.playerCountText.fontSize = fontSize;
+    this.playerCountText.fontFamily = fontFamily;
+    this.playerCountText.height = fontHeight;
+    this.playerCountText.width = "100%";
+    this.playerCountText.color = "white";
+    this.playerCountText.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+    this.playerCountText.textVerticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
+    this.debugInfoPanel.addControl(this.playerCountText);
+
+    this.latencyText = new TextBlock("latency", "Latency: 0ms");
+    this.latencyText.fontSize = fontSize;
+    this.latencyText.fontFamily = fontFamily;
+    this.latencyText.height = fontHeight;
+    this.latencyText.width = "100%";
+    this.latencyText.color = "white";
+    this.latencyText.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+    this.latencyText.textVerticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
+    this.debugInfoPanel.addControl(this.latencyText);
+
+    debugGroup.addControl(this.debugInfoPanel);
+  }
+
+  public updateDebugInfo() {
+    const roomName = this.connection.getRoomName();
+    const roomId = this.connection.getRoomId();
+    this.roomInfoText.text = `Room: ${roomName} (${roomId})`;
+    this.playerCountText.text = `Players: ${this.connection.getPlayerCount()}`;
+    this.latencyText.text = `Latency: ${this.connection.getLastLatency()}ms`;
   }
 }
