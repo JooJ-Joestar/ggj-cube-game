@@ -8,6 +8,7 @@ import {
   TextBlock,
   Rectangle
 } from "babylonjs-gui";
+import { Mesh } from "babylonjs";
 import { ColyseusConnection } from "./connection";
 
 export type PlayerMode = "move" | "place";
@@ -19,7 +20,9 @@ export class GameUI {
   private placeButton: Button;
   private colorButton: Button;
   private selectedColor = new Color3(1, 0.4, 0);
+  private readonly scene: Scene;
   private debugInfoPanel!: StackPanel;
+  private playerLabel: TextBlock;
   private roomInfoText!: TextBlock;
   private playerCountText!: TextBlock;
   private latencyText!: TextBlock;
@@ -30,6 +33,7 @@ export class GameUI {
   constructor(scene: Scene, connection: ColyseusConnection) {
     this.gui = AdvancedDynamicTexture.CreateFullscreenUI("game-ui", true, scene as any);
     this.gui.idealHeight = 720;
+    this.scene = scene;
 
     const rightBtnsStack = new StackPanel();
     rightBtnsStack.width = "180px";
@@ -51,6 +55,21 @@ export class GameUI {
     rightBtnsStack.addControl(this.placeButton);
     rightBtnsStack.addControl(this.colorButton);
 
+    this.playerLabel = new TextBlock("playerLabel", "");
+    this.playerLabel.color = "white";
+    this.playerLabel.fontSize = 18;
+    this.playerLabel.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
+    this.playerLabel.textVerticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
+    this.playerLabel.height = "30px";
+    this.playerLabel.width = "180px";
+    this.playerLabel.linkOffsetY = -60;
+    this.playerLabel.isPointerBlocker = false;
+    this.playerLabel.isVisible = false;
+    this.playerLabel.shadowColor = "black";
+    this.playerLabel.shadowBlur = 8;
+    this.playerLabel.shadowOffsetX = 0;
+    this.playerLabel.shadowOffsetY = 0;
+    this.gui.addControl(this.playerLabel);
     this.updateButtonStates();
     this.updateColorButton();
     this.createDebugInfo();
@@ -224,5 +243,20 @@ export class GameUI {
     if (this.connectionLostText) {
       this.connectionLostText.isVisible = !this.connection.isConnected();
     }
+    this.updatePlayerLabel();
+  }
+
+  private updatePlayerLabel() {
+    if (!this.playerLabel.isVisible) {
+      return;
+    }
+    const roomId = this.connection.getRoomId();
+    const connected = this.connection.isConnected();
+    this.playerLabel.text = connected ? `Room ${roomId}` : "Room n/a";
+  }
+
+  public attachPlayerMesh(mesh: Mesh) {
+    this.playerLabel.linkWithMesh(mesh);
+    this.playerLabel.isVisible = true;
   }
 }

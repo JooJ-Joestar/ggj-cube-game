@@ -157,4 +157,5 @@ export class PlayerModel {
       this.pathLine = null;
     }
   }
+
 }

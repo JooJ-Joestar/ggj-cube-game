@@ -68,6 +68,7 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
   camera.setTarget(player.mesh.position);
   const cameraOffset = camera.position.subtract(player.mesh.position);
   const ui = new GameUI(scene, colyseusConnection);
+  ui.attachPlayerMesh(player.mesh);
   const placedCubes = new Map<string, ColorCube>();
   let pendingPlacement: { position: Vector3; color: Color3 } | null = null;
   const gridKey = (position: Vector3) => `${position.x},${position.z}`;
