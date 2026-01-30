@@ -9,6 +9,7 @@ import {
   Rectangle
 } from "babylonjs-gui";
 import { Mesh } from "babylonjs";
+import { PlayerLabel } from "./models/PlayerLabel";
 import { ColyseusConnection } from "./connection";
 
 export type PlayerMode = "move" | "place";
@@ -22,9 +23,7 @@ export class GameUI {
   private selectedColor = new Color3(1, 0.4, 0);
   private readonly scene: Scene;
   private debugInfoPanel!: StackPanel;
-  private playerLabel: TextBlock;
-  private playerName?: string;
-  private playerMesh: Mesh | null = null;
+  private playerLabel: PlayerLabel;
   private roomInfoText!: TextBlock;
   private playerCountText!: TextBlock;
   private latencyText!: TextBlock;
@@ -57,30 +56,9 @@ export class GameUI {
     rightBtnsStack.addControl(this.placeButton);
     rightBtnsStack.addControl(this.colorButton);
 
-    this.playerLabel = new TextBlock("playerLabel", "");
-    this.playerLabel.color = "white";
-    this.playerLabel.fontSize = 18;
-    this.playerLabel.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
-    this.playerLabel.textVerticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
-    this.playerLabel.height = "30px";
-    this.playerLabel.width = "180px";
-    this.playerLabel.linkOffsetY = -60;
-    this.playerLabel.isPointerBlocker = false;
-    this.playerLabel.isVisible = false;
-    this.playerLabel.shadowColor = "black";
-    this.playerLabel.shadowBlur = 8;
-    this.playerLabel.shadowOffsetX = 0;
-    this.playerLabel.shadowOffsetY = 0;
-    this.gui.addControl(this.playerLabel);
+    this.playerLabel = new PlayerLabel(this.gui);
     this.connection.onPlayerNameAssigned((name) => {
-      if (this.playerName) {
-        return;
-      }
-      this.playerName = name;
-      this.playerLabel.text = name;
-      if (this.playerMesh) {
-        this.playerLabel.isVisible = true;
-      }
+      this.playerLabel.setName(name);
     });
     this.updateButtonStates();
     this.updateColorButton();
@@ -258,14 +236,7 @@ export class GameUI {
   }
 
   public attachPlayerMesh(mesh: Mesh) {
-    this.playerLabel.linkWithMesh(mesh);
-    this.playerMesh = mesh;
-    if (this.playerName) {
-      this.playerLabel.text = this.playerName;
-      this.playerLabel.isVisible = true;
-    } else {
-      this.playerLabel.isVisible = false;
-    }
+    this.playerLabel.attachToMesh(mesh);
   }
 
 }
