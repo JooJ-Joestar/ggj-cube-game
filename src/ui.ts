@@ -23,6 +23,7 @@ export class GameUI {
   private roomInfoText!: TextBlock;
   private playerCountText!: TextBlock;
   private latencyText!: TextBlock;
+  private connectionLostText!: TextBlock;
   public onModeChange: (mode: PlayerMode) => void = () => {};
   private readonly connection: ColyseusConnection;
 
@@ -200,6 +201,17 @@ export class GameUI {
     this.latencyText.textVerticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
     this.debugInfoPanel.addControl(this.latencyText);
 
+    this.connectionLostText = new TextBlock("connectionLost", "Connection lost");
+    this.connectionLostText.fontSize = fontSize;
+    this.connectionLostText.fontFamily = fontFamily;
+    this.connectionLostText.height = fontHeight;
+    this.connectionLostText.width = "100%";
+    this.connectionLostText.color = "red";
+    this.connectionLostText.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+    this.connectionLostText.textVerticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
+    this.connectionLostText.isVisible = false;
+    this.debugInfoPanel.addControl(this.connectionLostText);
+
     debugGroup.addControl(this.debugInfoPanel);
   }
 
@@ -209,5 +221,8 @@ export class GameUI {
     this.roomInfoText.text = `Room: ${roomName} (${roomId})`;
     this.playerCountText.text = `Players: ${this.connection.getPlayerCount()}`;
     this.latencyText.text = `Latency: ${this.connection.getLastLatency()}ms`;
+    if (this.connectionLostText) {
+      this.connectionLostText.isVisible = !this.connection.isConnected();
+    }
   }
 }

@@ -90,6 +90,10 @@ export class ColyseusConnection {
     return this.client;
   }
 
+  isConnected() {
+    return this.connected;
+  }
+
   getRoomName() {
     return this.room?.name ?? "n/a";
   }
