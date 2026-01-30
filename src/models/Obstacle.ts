@@ -1,6 +1,6 @@
 import { MeshBuilder, StandardMaterial, Color3, Scene, Vector3, Mesh } from "babylonjs";
 
-export class ObstacleModel {
+export class Obstacle {
   readonly mesh: Mesh;
 
   constructor(

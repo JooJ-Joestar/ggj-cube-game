@@ -7,20 +7,20 @@ import {
   Mesh,
   LinesMesh
 } from "babylonjs";
-import { ObstacleModel } from "./ObstacleModel";
+import { Obstacle } from "./Obstacle";
 import { colyseusConnection } from "../connection";
 
-export class PlayerModel {
+export class Player {
   readonly mesh: Mesh;
   private target: Vector3 | null = null;
-  private readonly obstacles: ObstacleModel[];
+  private readonly obstacles: Obstacle[];
   private readonly maxSpeed = 3; // units per second
   private pathLine: LinesMesh | null = null;
   private pathPoints: Vector3[] = [];
   private currentSegmentIndex = 0;
   private destinationCallback: ((position: Vector3) => void) | null = null;
 
-  constructor(scene: Scene, obstacles: ObstacleModel[]) {
+  constructor(scene: Scene, obstacles: Obstacle[]) {
     this.obstacles = obstacles;
     this.mesh = MeshBuilder.CreateBox("PlayerCube", { size: 1 }, scene);
     this.mesh.renderingGroupId = 1;
@@ -123,7 +123,7 @@ export class PlayerModel {
   private lineIntersectsObstacle(
     start: Vector3,
     end: Vector3,
-    obstacle: ObstacleModel,
+    obstacle: Obstacle,
     clearance: number
   ) {
     const dir = end.subtract(start);

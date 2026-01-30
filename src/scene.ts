@@ -10,8 +10,8 @@ import {
   PointerEventTypes,
   LinesMesh
 } from "babylonjs";
-import { ObstacleModel } from "./models/ObstacleModel";
-import { PlayerModel } from "./models/PlayerModel";
+import { Obstacle } from "./models/Obstacle";
+import { Player } from "./models/Player";
 import { ColorCube } from "./models/ColorCube";
 import { GameUI, PlayerMode } from "./ui";
 import { colyseusConnection } from "./connection";
@@ -60,11 +60,11 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
   gridOverlay.isPickable = false;
   gridOverlay.renderingGroupId = 0;
 
-  const obstacles: ObstacleModel[] = [];
-  obstacles.push(new ObstacleModel(scene, new Vector3(3, 0, 3)));
-  obstacles.push(new ObstacleModel(scene, new Vector3(-4, 0, -1)));
+  const obstacles: Obstacle[] = [];
+  obstacles.push(new Obstacle(scene, new Vector3(3, 0, 3)));
+  obstacles.push(new Obstacle(scene, new Vector3(-4, 0, -1)));
 
-  const player = new PlayerModel(scene, obstacles);
+  const player = new Player(scene, obstacles);
   camera.setTarget(player.mesh.position);
   const cameraOffset = camera.position.subtract(player.mesh.position);
   const ui = new GameUI(scene, colyseusConnection);
