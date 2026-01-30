@@ -250,9 +250,9 @@ export class GameUI {
     if (!this.playerLabel.isVisible) {
       return;
     }
-    const roomId = this.connection.getRoomId();
     const connected = this.connection.isConnected();
-    this.playerLabel.text = connected ? `Room ${roomId}` : "Room n/a";
+    const playerName = this.connection.getPlayerName();
+    this.playerLabel.text = connected ? playerName : "Player n/a";
   }
 
   public attachPlayerMesh(mesh: Mesh) {

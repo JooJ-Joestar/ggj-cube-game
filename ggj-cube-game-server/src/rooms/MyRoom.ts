@@ -1,4 +1,9 @@
 import { Room, Client } from "@colyseus/core";
+import {
+  uniqueNamesGenerator,
+  adjectives,
+  animals
+} from "unique-names-generator";
 import { MyRoomState } from "./schema/MyRoomState";
 
 export class MyRoom extends Room<MyRoomState> {
@@ -14,7 +19,13 @@ export class MyRoom extends Room<MyRoomState> {
   }
 
   onJoin (client: Client, options: any) {
-    console.log(client.sessionId, "joined!");
+    const playerName = uniqueNamesGenerator({
+      dictionaries: [adjectives, animals],
+      separator: " ",
+      style: "capital"
+    });
+    client.send("assignName", { name: playerName });
+    console.log(client.sessionId, "joined as", playerName);
   }
 
   onLeave (client: Client, consented: boolean) {

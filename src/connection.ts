@@ -12,6 +12,7 @@ export class ColyseusConnection {
   private readonly serverUrl: string;
   private connected = false;
   private disconnectedAt: number | null = null;
+  private playerName = "Player n/a";
 
   constructor() {
     this.serverUrl = process.env.COLYSEUS_URL || DEFAULT_URL;
@@ -68,9 +69,15 @@ export class ColyseusConnection {
       this.room = null;
       this.disconnectedAt = Date.now();
       this.connected = false;
+      this.playerName = "Player n/a";
     });
     room.onError((err) => {
       console.warn("Room error", err);
+    });
+    room.onMessage("assignName", (message: { name?: string }) => {
+      if (message?.name) {
+        this.playerName = message.name;
+      }
     });
   }
 
@@ -115,6 +122,14 @@ export class ColyseusConnection {
       return 0;
     }
     return Math.round(transport.latency);
+  }
+
+  getPlayerName() {
+    return this.playerName;
+  }
+
+  getPlayerId() {
+    return this.room?.sessionId ?? "n/a";
   }
 }
 
