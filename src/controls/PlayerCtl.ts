@@ -7,10 +7,10 @@ import {
   Mesh,
   LinesMesh
 } from "babylonjs";
-import { Obstacle } from "./Obstacle";
+import { Obstacle } from "../models/Obstacle";
 import { colyseusConnection } from "../connection";
 
-export class Player {
+export class PlayerCtl {
   readonly mesh: Mesh;
   private target: Vector3 | null = null;
   private readonly obstacles: Obstacle[];
@@ -157,5 +157,4 @@ export class Player {
       this.pathLine = null;
     }
   }
-
 }

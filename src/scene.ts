@@ -11,9 +11,9 @@ import {
   LinesMesh
 } from "babylonjs";
 import { Obstacle } from "./models/Obstacle";
-import { Player } from "./models/Player";
+import { PlayerCtl } from "./controls/PlayerCtl";
 import { ColorCube } from "./models/ColorCube";
-import { GameUI, PlayerMode } from "./ui";
+import { GameUI, PlayerMode } from "./ui/gameUI";
 import { colyseusConnection } from "./connection";
 
 export function createScene(canvas: HTMLCanvasElement): Scene {
@@ -64,7 +64,7 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
   obstacles.push(new Obstacle(scene, new Vector3(3, 0, 3)));
   obstacles.push(new Obstacle(scene, new Vector3(-4, 0, -1)));
 
-  const player = new Player(scene, obstacles);
+  const player = new PlayerCtl(scene, obstacles);
   camera.setTarget(player.mesh.position);
   const cameraOffset = camera.position.subtract(player.mesh.position);
   const ui = new GameUI(scene, colyseusConnection);
@@ -121,7 +121,7 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
     const deltaSeconds = engine.getDeltaTime() / 1000;
     camera.setTarget(player.mesh.position);
     player.update(deltaSeconds);
-    ui.updateDebugInfo();
+    ui.updateDebugInfo(colyseusConnection);
     camera.position = player.mesh.position.add(cameraOffset);
     scene.render();
   });
