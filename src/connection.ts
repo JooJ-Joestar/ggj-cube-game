@@ -12,7 +12,8 @@ export class ColyseusConnection {
   private readonly serverUrl: string;
   private connected = false;
   private disconnectedAt: number | null = null;
-  private playerName = "Player n/a";
+  private playerName = "";
+  private playerNameListeners: Array<(name: string) => void> = [];
 
   constructor() {
     this.serverUrl = process.env.COLYSEUS_URL || DEFAULT_URL;
@@ -34,6 +35,7 @@ export class ColyseusConnection {
       this.connected = true;
       this.disconnectedAt = null;
       this.hookRoomEvents(room);
+      room.send("whoAmI");
       console.info("Joined room", room.roomId);
       return room;
     } catch (err) {
@@ -69,14 +71,14 @@ export class ColyseusConnection {
       this.room = null;
       this.disconnectedAt = Date.now();
       this.connected = false;
-      this.playerName = "Player n/a";
+      this.playerName = "";
     });
     room.onError((err) => {
       console.warn("Room error", err);
     });
     room.onMessage("assignName", (message: { name?: string }) => {
       if (message?.name) {
-        this.playerName = message.name;
+        this.setPlayerName(message.name);
       }
     });
   }
@@ -131,6 +133,22 @@ export class ColyseusConnection {
   getPlayerId() {
     return this.room?.sessionId ?? "n/a";
   }
+
+  private setPlayerName(name: string) {
+    if (this.playerName) {
+      return;
+    }
+    this.playerName = name;
+    this.playerNameListeners.forEach((listener) => listener(name));
+  }
+
+  onPlayerNameAssigned(callback: (name: string) => void) {
+    this.playerNameListeners.push(callback);
+    if (this.playerName) {
+      callback(this.playerName);
+    }
+  }
+
 }
 
 export const colyseusConnection = new ColyseusConnection();

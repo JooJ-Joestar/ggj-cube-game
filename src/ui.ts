@@ -23,6 +23,8 @@ export class GameUI {
   private readonly scene: Scene;
   private debugInfoPanel!: StackPanel;
   private playerLabel: TextBlock;
+  private playerName?: string;
+  private playerMesh: Mesh | null = null;
   private roomInfoText!: TextBlock;
   private playerCountText!: TextBlock;
   private latencyText!: TextBlock;
@@ -70,6 +72,16 @@ export class GameUI {
     this.playerLabel.shadowOffsetX = 0;
     this.playerLabel.shadowOffsetY = 0;
     this.gui.addControl(this.playerLabel);
+    this.connection.onPlayerNameAssigned((name) => {
+      if (this.playerName) {
+        return;
+      }
+      this.playerName = name;
+      this.playerLabel.text = name;
+      if (this.playerMesh) {
+        this.playerLabel.isVisible = true;
+      }
+    });
     this.updateButtonStates();
     this.updateColorButton();
     this.createDebugInfo();
@@ -243,20 +255,17 @@ export class GameUI {
     if (this.connectionLostText) {
       this.connectionLostText.isVisible = !this.connection.isConnected();
     }
-    this.updatePlayerLabel();
-  }
-
-  private updatePlayerLabel() {
-    if (!this.playerLabel.isVisible) {
-      return;
-    }
-    const connected = this.connection.isConnected();
-    const playerName = this.connection.getPlayerName();
-    this.playerLabel.text = connected ? playerName : "Player n/a";
   }
 
   public attachPlayerMesh(mesh: Mesh) {
     this.playerLabel.linkWithMesh(mesh);
-    this.playerLabel.isVisible = true;
+    this.playerMesh = mesh;
+    if (this.playerName) {
+      this.playerLabel.text = this.playerName;
+      this.playerLabel.isVisible = true;
+    } else {
+      this.playerLabel.isVisible = false;
+    }
   }
+
 }

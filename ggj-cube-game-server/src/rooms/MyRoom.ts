@@ -9,12 +9,17 @@ import { MyRoomState } from "./schema/MyRoomState";
 export class MyRoom extends Room<MyRoomState> {
   maxClients = 4;
   state = new MyRoomState();
+  private playerNames = new Map<string, string>();
 
   onCreate (options: any) {
     this.onMessage("type", (client, message) => {
       //
       // handle "type" message
       //
+    });
+
+    this.onMessage("whoAmI", (client) => {
+      this.replyWithName(client);
     });
   }
 
@@ -24,11 +29,12 @@ export class MyRoom extends Room<MyRoomState> {
       separator: " ",
       style: "capital"
     });
-    client.send("assignName", { name: playerName });
+    this.playerNames.set(client.sessionId, playerName);
     console.log(client.sessionId, "joined as", playerName);
   }
 
   onLeave (client: Client, consented: boolean) {
+    this.playerNames.delete(client.sessionId);
     console.log(client.sessionId, "left!");
   }
 
@@ -36,4 +42,8 @@ export class MyRoom extends Room<MyRoomState> {
     console.log("room", this.roomId, "disposing...");
   }
 
+  private replyWithName(client: Client) {
+    const name = this.playerNames.get(client.sessionId) ?? "Player n/a";
+    client.send("assignName", { name });
+  }
 }
