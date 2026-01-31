@@ -21,6 +21,17 @@ type QuickAttackPayload = {
 };
 type HealthUpdatePayload = { id: string; health: number };
 type PlayerHitPayload = { id: string };
+type PlaceCubePayload = {
+  id: string;
+  position: { x: number; y: number; z: number };
+  color: { r: number; g: number; b: number };
+};
+type PlacedCubesPayload = {
+  cubes: Array<{
+    position: { x: number; y: number; z: number };
+    color: { r: number; g: number; b: number };
+  }>;
+};
 
 export enum MatchStatusCode {
   Play = 1,
@@ -45,6 +56,8 @@ export class ColyseusConnection {
   private healthListeners: Array<(payload: HealthUpdatePayload) => void> = [];
   private respawnListeners: Array<(payload: HealthUpdatePayload) => void> = [];
   private hitListeners: Array<(payload: PlayerHitPayload) => void> = [];
+  private placeCubeListeners: Array<(payload: PlaceCubePayload) => void> = [];
+  private placedCubesListeners: Array<(payload: PlacedCubesPayload) => void> = [];
   private matchStatus = MatchStatusCode.Play;
   private latestScoreboard: ScoreboardEntry[] = [];
 
@@ -155,6 +168,18 @@ export class ColyseusConnection {
         return;
       }
       this.hitListeners.forEach((listener) => listener(message));
+    });
+    room.onMessage("cubePlaced", (message: PlaceCubePayload) => {
+      if (!message?.id) {
+        return;
+      }
+      this.placeCubeListeners.forEach((listener) => listener(message));
+    });
+    room.onMessage("placedCubes", (message: PlacedCubesPayload) => {
+      if (!message?.cubes) {
+        return;
+      }
+      this.placedCubesListeners.forEach((listener) => listener(message));
     });
 
     room.onMessage("playerJoined", (message: RemotePlayerInfo) => {
@@ -287,6 +312,14 @@ export class ColyseusConnection {
     this.hitListeners.push(callback);
   }
 
+  onCubePlaced(callback: (payload: PlaceCubePayload) => void) {
+    this.placeCubeListeners.push(callback);
+  }
+
+  onPlacedCubes(callback: (payload: PlacedCubesPayload) => void) {
+    this.placedCubesListeners.push(callback);
+  }
+
   isMatchPaused() {
     return this.matchStatus === MatchStatusCode.Pause;
   }
@@ -336,6 +369,16 @@ export class ColyseusConnection {
       return;
     }
     this.room.send("playerHit", payload);
+  }
+
+  sendPlaceCube(payload: {
+    position: { x: number; y: number; z: number };
+    color: { r: number; g: number; b: number };
+  }) {
+    if (!this.room) {
+      return;
+    }
+    this.room.send("placeCube", payload);
   }
 }
 

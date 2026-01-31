@@ -175,20 +175,37 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
     spawnQuickAttack(origin, direction, distance, speed, payload.id);
   });
 
-  colyseusConnection.onRemoteQuickAttack((payload) => {
-    const direction = new Vector3(
-      payload.direction.x,
-      payload.direction.y,
-      payload.direction.z
-    );
-    if (direction.lengthSquared() < 0.0001) {
-      direction.copyFromFloats(0, 0, 1);
+  colyseusConnection.onCubePlaced((payload) => {
+    if (payload.id === localPlayerId) {
+      return;
     }
-    direction.normalize();
-    const origin = new Vector3(payload.position.x, payload.position.y, payload.position.z);
-    const distance = payload.distance ?? player.getQuickAttackDistance();
-    const speed = payload.speed ?? player.getQuickAttackSpeed();
-    spawnQuickAttack(origin, direction, distance, speed, payload.id);
+    const position = new Vector3(payload.position.x, payload.position.y, payload.position.z);
+    const key = gridKey(position);
+    const existing = placedCubes.get(key);
+    if (existing) {
+      existing.mesh.dispose();
+    }
+    const color = new Color3(payload.color.r, payload.color.g, payload.color.b);
+    const cube = new ColorCube(scene, position, color);
+    placedCubes.set(key, cube);
+  });
+
+  colyseusConnection.onPlacedCubes(({ cubes }) => {
+    cubes.forEach((cubeInfo) => {
+      const position = new Vector3(
+        cubeInfo.position.x,
+        cubeInfo.position.y,
+        cubeInfo.position.z
+      );
+      const key = gridKey(position);
+      const existing = placedCubes.get(key);
+      if (existing) {
+        existing.mesh.dispose();
+      }
+      const color = new Color3(cubeInfo.color.r, cubeInfo.color.g, cubeInfo.color.b);
+      const cube = new ColorCube(scene, position, color);
+      placedCubes.set(key, cube);
+    });
   });
 
   colyseusConnection.onMatchStatusChange((status) => {
@@ -249,6 +266,18 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
     }
     const cube = new ColorCube(scene, pendingPlacement.position, pendingPlacement.color);
     placedCubes.set(key, cube);
+    colyseusConnection.sendPlaceCube({
+      position: {
+        x: pendingPlacement.position.x,
+        y: pendingPlacement.position.y,
+        z: pendingPlacement.position.z
+      },
+      color: {
+        r: pendingPlacement.color.r,
+        g: pendingPlacement.color.g,
+        b: pendingPlacement.color.b
+      }
+    });
     pendingPlacement = null;
   });
   ui.onModeChange = (mode) => {

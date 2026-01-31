@@ -15,6 +15,10 @@ export class MyRoom extends Room<MyRoomState> {
   private playerNames = new Map<string, string>();
   private playerScores = new Map<string, number>();
   private playerHealth = new Map<string, number>();
+  private placedCubes: Array<{
+    position: { x: number; y: number; z: number };
+    color: { r: number; g: number; b: number };
+  }> = [];
   private matchPlayDuration = 60;
   private matchPauseDuration = 15;
   private matchLoopAbort = false;
@@ -73,6 +77,27 @@ export class MyRoom extends Room<MyRoomState> {
           direction: message.direction,
           speed: message.speed,
           distance: message.distance
+        });
+      }
+    );
+
+    this.onMessage(
+      "placeCube",
+      (
+        client,
+        message: {
+          position?: { x: number; y: number; z: number };
+          color?: { r: number; g: number; b: number };
+        }
+      ) => {
+        if (!message?.position || !message?.color) {
+          return;
+        }
+        this.upsertPlacedCube(message.position, message.color);
+        this.broadcast("cubePlaced", {
+          id: client.sessionId,
+          position: message.position,
+          color: message.color
         });
       }
     );
@@ -144,6 +169,7 @@ export class MyRoom extends Room<MyRoomState> {
       name: playerName,
       health: this.playerHealth.get(client.sessionId) ?? 100
     });
+    client.send("placedCubes", { cubes: this.placedCubes });
     console.log(client.sessionId, "joined as", playerName);
   }
 
@@ -236,5 +262,20 @@ export class MyRoom extends Room<MyRoomState> {
   private replyWithName(client: Client) {
     const name = this.playerNames.get(client.sessionId) ?? "Player n/a";
     client.send("assignName", { name });
+  }
+
+  private upsertPlacedCube(
+    position: { x: number; y: number; z: number },
+    color: { r: number; g: number; b: number }
+  ) {
+    const key = `${position.x},${position.z}`;
+    const index = this.placedCubes.findIndex(
+      (cube) => `${cube.position.x},${cube.position.z}` === key
+    );
+    if (index >= 0) {
+      this.placedCubes[index] = { position, color };
+      return;
+    }
+    this.placedCubes.push({ position, color });
   }
 }
