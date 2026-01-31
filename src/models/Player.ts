@@ -5,6 +5,7 @@ import { PlayerFactory } from "../factory/PlayerFactory";
 export class Player {
   readonly mesh: Mesh;
   public id: string;
+  private className = "none";
   private quickAttackDistance = 5;
   private quickAttackSpeed = 12;
   private quickAttackCooldownMs = 300;
@@ -27,6 +28,30 @@ export class Player {
     const material = this.mesh.material;
     if (material && material instanceof StandardMaterial) {
       material.diffuseColor = color;
+    }
+  }
+
+  setClassColor(className: string) {
+    const normalized = className.trim().toLowerCase();
+    this.className = normalized || "none";
+    this.setColor(Player.getClassColor(this.className));
+  }
+
+  getClassName() {
+    return this.className;
+  }
+
+  static getClassColor(className: string) {
+    switch (className.trim().toLowerCase()) {
+      case "engineer":
+        return new Color3(1, 0.9, 0);
+      case "soldier":
+        return new Color3(0, 0.4, 0.45);
+      case "scout":
+        return new Color3(1, 1, 1);
+      case "none":
+      default:
+        return new Color3(0.2, 0.6, 1);
     }
   }
 

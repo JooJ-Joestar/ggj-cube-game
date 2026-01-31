@@ -6,7 +6,7 @@ type RoomWithClients<State = unknown> = Room<State> & {
 
 const DEFAULT_URL = "ws://localhost:2567";
 
-type RemotePlayerInfo = { id: string; name: string; health?: number };
+type RemotePlayerInfo = { id: string; name: string; health?: number; className?: string };
 type RemotePlayerMovement = { id: string; position: { x: number; y: number; z: number } };
 type MatchTimePayload = { time: number };
 type ScoreboardEntry = { id: string; name: string; score: number };
@@ -21,6 +21,7 @@ type QuickAttackPayload = {
 };
 type HealthUpdatePayload = { id: string; health: number };
 type PlayerHitPayload = { id: string };
+type PlayerClassPayload = { id: string; className: string };
 type PlaceCubePayload = {
   id: string;
   position: { x: number; y: number; z: number };
@@ -60,6 +61,7 @@ export class ColyseusConnection {
   private healthListeners: Array<(payload: HealthUpdatePayload) => void> = [];
   private respawnListeners: Array<(payload: HealthUpdatePayload) => void> = [];
   private hitListeners: Array<(payload: PlayerHitPayload) => void> = [];
+  private classListeners: Array<(payload: PlayerClassPayload) => void> = [];
   private placeCubeListeners: Array<(payload: PlaceCubePayload) => void> = [];
   private removeCubeListeners: Array<(payload: RemoveCubePayload) => void> = [];
   private placedCubesListeners: Array<(payload: PlacedCubesPayload) => void> = [];
@@ -206,6 +208,11 @@ export class ColyseusConnection {
       }
       this.remotePlayerIds.add(message.id);
       this.remotePlayerJoinListeners.forEach((listener) => listener(message));
+      if (message.className) {
+        this.classListeners.forEach((listener) =>
+          listener({ id: message.id, className: message.className as string })
+        );
+      }
     });
     room.onMessage("playerMoved", (message: RemotePlayerMovement) => {
       if (message.id === room.sessionId) {
@@ -219,6 +226,15 @@ export class ColyseusConnection {
       }
       this.remotePlayerIds.delete(id);
       this.remotePlayerLeaveListeners.forEach((listener) => listener(id));
+    });
+    room.onMessage("playerClass", (message: PlayerClassPayload) => {
+      if (!message?.id || !message.className) {
+        return;
+      }
+      if (message.id === room.sessionId) {
+        return;
+      }
+      this.classListeners.forEach((listener) => listener(message));
     });
   }
 
@@ -303,6 +319,10 @@ export class ColyseusConnection {
     this.remotePlayerLeaveListeners.push(callback);
   }
 
+  onPlayerClassChanged(callback: (payload: PlayerClassPayload) => void) {
+    this.classListeners.push(callback);
+  }
+
   onMatchTimeChange(callback: (seconds: number) => void) {
     this.matchTimeListeners.push(callback);
   }
@@ -368,6 +388,13 @@ export class ColyseusConnection {
       return;
     }
     this.room.send("quickAttack", payload);
+  }
+
+  sendPlayerClass(payload: { className: string }) {
+    if (!this.room) {
+      return;
+    }
+    this.room.send("playerClass", payload);
   }
 
   sendPlayerHealthUpdate(payload: { id: string; health: number }) {

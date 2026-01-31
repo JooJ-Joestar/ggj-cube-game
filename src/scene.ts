@@ -96,6 +96,8 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
   let quickAttackEnabled = true;
   const scoutSpecialCooldownMs = getEnvNumber("SCOUT_SPECIAL_COOLDOWN_MS", 5000);
   let lastSpecialAt = 0;
+  let nextSpecialReadyAt = 0;
+  let specialReady = true;
   const getRandomSpawnPosition = () => {
     const range = 2;
     const x = Math.round((Math.random() * 2 - 1) * range);
@@ -130,21 +132,24 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
     });
   };
 
-  const spawnRemotePlayer = (id: string) => {
+  const spawnRemotePlayer = (id: string, className?: string) => {
     if (remotePlayers.has(id)) {
       return remotePlayers.get(id) ?? null;
     }
     const remote = new Player(playerFactory, id, false);
+    if (className) {
+      remote.setClassColor(className);
+    }
     remote.setPosition(getRandomSpawnPosition());
     remotePlayers.set(id, remote);
     return remote;
   };
 
-  colyseusConnection.onRemotePlayerJoined(({ id, name, health }) => {
+  colyseusConnection.onRemotePlayerJoined(({ id, name, health, className }) => {
     if (id === colyseusConnection.getPlayerId()) {
       return;
     }
-    const remote = spawnRemotePlayer(id);
+    const remote = spawnRemotePlayer(id, className);
     if (remote) {
       ui.attachRemotePlayerLabel(id, name, remote.mesh);
       ui.attachPlayerHealthBar(id, remote.mesh, 100);
@@ -152,6 +157,14 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
         ui.updatePlayerHealth(id, health, 100);
       }
     }
+  });
+
+  colyseusConnection.onPlayerClassChanged(({ id, className }) => {
+    const remote = remotePlayers.get(id);
+    if (!remote) {
+      return;
+    }
+    remote.setClassColor(className);
   });
 
   colyseusConnection.onRemotePlayerMoved(({ id, position }) => {
@@ -321,7 +334,10 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
     const cube = new ColorCube(scene, pendingPlacement.position, pendingPlacement.color);
     const colorId = colorToPaletteId(pendingPlacement.color);
     placedCubes.set(key, { cube, colorId });
-    player.checkDrawingsAt(pendingPlacement.position);
+    const matched = player.checkDrawingsAt(pendingPlacement.position);
+    if (matched && matched !== "redbull") {
+      colyseusConnection.sendPlayerClass({ className: player.getCurrentClass() });
+    }
     colyseusConnection.sendPlaceCube({
       position: {
         x: pendingPlacement.position.x,
@@ -384,6 +400,9 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
       return;
     }
     lastSpecialAt = now;
+    nextSpecialReadyAt = now + scoutSpecialCooldownMs;
+    specialReady = scoutSpecialCooldownMs <= 0;
+    ui.setSpecialEnabled(specialReady);
     const direction = player.getFacingDirection();
     direction.y = 0;
     if (direction.lengthSquared() < 0.0001) {
@@ -397,6 +416,12 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
     if (localPlayerId) {
       spawnQuickAttack(origin, direction, distance, speed, localPlayerId);
     }
+    colyseusConnection.sendQuickAttack({
+      position: { x: origin.x, y: origin.y, z: origin.z },
+      direction: { x: direction.x, y: direction.y, z: direction.z },
+      speed,
+      distance
+    });
   };
 
   scene.onPointerObservable.add((pointerInfo) => {
@@ -442,6 +467,10 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
     if (!quickAttackEnabled && now >= nextQuickAttackReadyAt) {
       quickAttackEnabled = true;
       ui.setQuickAttackEnabled(true);
+    }
+    if (!specialReady && now >= nextSpecialReadyAt) {
+      specialReady = true;
+      ui.setSpecialEnabled(true);
     }
     if (projectiles.length) {
       for (let i = projectiles.length - 1; i >= 0; i--) {
@@ -506,6 +535,7 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
     player.setInvincibleForSeconds(player.getDamageCooldownTime());
     ui.attachPlayerHealthBar(localPlayerId, player.mesh, 100);
     ui.updatePlayerHealth(localPlayerId, player.getHealth(), 100);
+    colyseusConnection.sendPlayerClass({ className: player.getCurrentClass() });
   });
   return scene;
 }

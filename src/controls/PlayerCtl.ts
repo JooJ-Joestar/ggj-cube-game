@@ -63,6 +63,7 @@ export class PlayerCtl extends Player {
   private readonly defaultSpawnClass = this.getEnvString("DEFAULT_SPAWN_CLASS", "none");
   private scoutApplied = false;
   private baseColor: Color3;
+  private currentClass = "none";
   private scoutBaseQuickAttackSpeed: number | null = null;
   private scoutBaseQuickAttackDistance: number | null = null;
   private pathLine: LinesMesh | null = null;
@@ -81,6 +82,7 @@ export class PlayerCtl extends Player {
     } else {
       this.baseColor = new Color3(0.2, 0.6, 1);
     }
+    this.currentClass = "none";
     this.scoutBaseQuickAttackSpeed = this.getQuickAttackSpeed();
     this.scoutBaseQuickAttackDistance = this.getQuickAttackDistance();
     this.applySpawnClass(this.defaultSpawnClass);
@@ -179,7 +181,7 @@ export class PlayerCtl extends Player {
 
   checkDrawingsAt(position: Vector3) {
     if (!this.drawingAccess) {
-      return;
+      return null;
     }
     const baseX = Math.round(position.x);
     const baseZ = Math.round(position.z);
@@ -195,12 +197,13 @@ export class PlayerCtl extends Player {
           for (const transform of transforms) {
             if (this.matchesTemplateAt(anchorX, anchorZ, template, transform)) {
               this.spawnEntity(template, anchorX, anchorZ, transform);
-              return;
+              return template.name;
             }
           }
         }
       }
     }
+    return null;
   }
 
   private matchesTemplateAt(
@@ -259,9 +262,11 @@ export class PlayerCtl extends Player {
     }
     if (template.name === "scout") {
       this.applyScoutBoost();
+      this.currentClass = "scout";
     }
     if (template.name === "engineer" || template.name === "soldier") {
-      this.resetScoutBoost();
+      this.resetScoutBoost(template.name);
+      this.currentClass = template.name;
     }
     for (let row = 0; row < template.height; row++) {
       for (let col = 0; col < template.width; col++) {
@@ -298,11 +303,14 @@ export class PlayerCtl extends Player {
     this.setQuickAttackParams(boostedDistance, boostedSpeed);
   }
 
-  private resetScoutBoost() {
+  private resetScoutBoost(className: string) {
     if (!this.scoutApplied) {
+      this.setClassColor(className);
+      this.baseColor = Player.getClassColor(className);
       return;
     }
     this.scoutApplied = false;
+    this.baseColor = Player.getClassColor(className);
     this.setColor(this.baseColor);
     this.setQuickAttackParams(
       this.scoutBaseQuickAttackDistance ?? this.getQuickAttackDistance(),
@@ -314,13 +322,20 @@ export class PlayerCtl extends Player {
     const normalized = className.trim().toLowerCase();
     if (normalized === "scout") {
       this.applyScoutBoost();
+      this.currentClass = "scout";
       return;
     }
     if (normalized === "engineer" || normalized === "soldier" || normalized === "none") {
-      this.resetScoutBoost();
+      this.resetScoutBoost(normalized);
+      this.currentClass = normalized;
       return;
     }
-    this.resetScoutBoost();
+    this.resetScoutBoost("none");
+    this.currentClass = "none";
+  }
+
+  getCurrentClass() {
+    return this.currentClass;
   }
 
   private getEnvNumber(key: string, fallback: number) {

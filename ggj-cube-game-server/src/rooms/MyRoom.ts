@@ -16,6 +16,7 @@ export class MyRoom extends Room<MyRoomState> {
   private playerNames = new Map<string, string>();
   private playerScores = new Map<string, number>();
   private playerHealth = new Map<string, number>();
+  private playerClasses = new Map<string, string>();
   private placedCubes: Array<{
     position: { x: number; y: number; z: number };
     color: { r: number; g: number; b: number };
@@ -25,6 +26,8 @@ export class MyRoom extends Room<MyRoomState> {
   private matchLoopAbort = false;
   private matchLoopRunning = false;
   private scoreboardInterval: ReturnType<typeof setInterval> | null = null;
+  private currentMatchStatus = MyRoom.MATCH_PLAY_STATUS_CODE;
+  private currentMatchTime = 0;
 
   onCreate(options: any) {
     this.matchPlayDuration = this.getEnvDuration("MATCH_PLAY_TIME", 60);
@@ -49,6 +52,12 @@ export class MyRoom extends Room<MyRoomState> {
       }
       const name = this.playerNames.get(id) ?? "Player n/a";
       client.send("whoIsResult", { id, name });
+    });
+
+    this.onMessage("playerClass", (client, message: { className?: string }) => {
+      const className = message?.className ?? "none";
+      this.playerClasses.set(client.sessionId, className);
+      this.broadcast("playerClass", { id: client.sessionId, className });
     });
 
     this.onMessage("playerMove", (client, message) => {
@@ -170,21 +179,26 @@ export class MyRoom extends Room<MyRoomState> {
     this.playerNames.set(client.sessionId, playerName);
     this.playerScores.set(client.sessionId, 0);
     this.playerHealth.set(client.sessionId, 100);
+    this.playerClasses.set(client.sessionId, "none");
     for (const [otherId, otherName] of this.playerNames.entries()) {
       if (otherId !== client.sessionId) {
         client.send("playerJoined", {
           id: otherId,
           name: otherName,
-          health: this.playerHealth.get(otherId) ?? 100
+          health: this.playerHealth.get(otherId) ?? 100,
+          className: this.playerClasses.get(otherId) ?? "none"
         });
       }
     }
     this.broadcast("playerJoined", {
       id: client.sessionId,
       name: playerName,
-      health: this.playerHealth.get(client.sessionId) ?? 100
+      health: this.playerHealth.get(client.sessionId) ?? 100,
+      className: this.playerClasses.get(client.sessionId) ?? "none"
     });
     client.send("placedCubes", { cubes: this.placedCubes });
+    client.send("matchStatusChange", { status: this.currentMatchStatus });
+    client.send("matchTimeChange", { time: this.currentMatchTime });
     console.log(client.sessionId, "joined as", playerName);
   }
 
@@ -192,6 +206,7 @@ export class MyRoom extends Room<MyRoomState> {
     this.playerNames.delete(client.sessionId);
     this.playerScores.delete(client.sessionId);
     this.playerHealth.delete(client.sessionId);
+    this.playerClasses.delete(client.sessionId);
     this.broadcast("playerLeft", { id: client.sessionId });
     console.log(client.sessionId, "left!");
   }
@@ -226,12 +241,21 @@ export class MyRoom extends Room<MyRoomState> {
   }
 
   private async runPhase(statusCode: number, durationSeconds: number) {
+    const previousStatus = this.currentMatchStatus;
+    this.currentMatchStatus = statusCode;
+    this.currentMatchTime = Math.max(0, Math.round(durationSeconds));
+    this.resetScores();
+    if (statusCode === MyRoom.MATCH_PLAY_STATUS_CODE &&
+        previousStatus === MyRoom.MATCH_PAUSE_STATUS_CODE) {
+      this.respawnAllPlayers();
+    }
     this.broadcast("matchStatusChange", { status: statusCode });
-    const ticks = Math.max(0, Math.round(durationSeconds));
+    const ticks = this.currentMatchTime;
     for (let remaining = ticks; remaining >= 0; remaining--) {
       if (this.matchLoopAbort) {
         return;
       }
+      this.currentMatchTime = remaining;
       this.broadcast("matchTimeChange", { time: remaining });
       if (remaining === 0) {
         break;
@@ -248,6 +272,20 @@ export class MyRoom extends Room<MyRoomState> {
       }
       this.broadcastScoreboard();
     }, 500);
+  }
+
+  private resetScores() {
+    for (const id of this.playerScores.keys()) {
+      this.playerScores.set(id, 0);
+    }
+    this.broadcastScoreboard();
+  }
+
+  private respawnAllPlayers() {
+    for (const id of this.playerHealth.keys()) {
+      this.playerHealth.set(id, 100);
+      this.broadcast("playerRespawn", { id, health: 100 });
+    }
   }
 
   private broadcastScoreboard() {

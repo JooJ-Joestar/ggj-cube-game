@@ -6,7 +6,10 @@ export class PlayerAttacks {
   private readonly specialButton: Button;
   private readonly quickAttackEnabledColor = "rgba(173, 216, 230, 1)";
   private readonly quickAttackDisabledColor = "rgba(140, 140, 140, 0.8)";
+  private readonly specialEnabledColor = "rgba(173, 216, 230, 1)";
+  private readonly specialDisabledColor = "rgba(140, 140, 140, 0.8)";
   private quickAttackReady = true;
+  private specialReady = true;
   public onQuickAttack: () => void = () => {};
   public onSpecial: () => void = () => {};
 
@@ -27,7 +30,11 @@ export class PlayerAttacks {
       () => this.onQuickAttack(),
       () => this.quickAttackReady
     );
-    this.specialButton = this.createButton("Special", () => this.onSpecial());
+    this.specialButton = this.createButton(
+      "Special",
+      () => this.onSpecial(),
+      () => this.specialReady
+    );
 
     this.container.addControl(this.quickAttackButton);
     this.container.addControl(this.specialButton);
@@ -38,6 +45,11 @@ export class PlayerAttacks {
     this.quickAttackButton.background = enabled
       ? this.quickAttackEnabledColor
       : this.quickAttackDisabledColor;
+  }
+
+  setSpecialEnabled(enabled: boolean) {
+    this.specialReady = enabled;
+    this.specialButton.background = enabled ? this.specialEnabledColor : this.specialDisabledColor;
   }
 
   private createButton(text: string, handler: () => void, canActivate?: () => boolean) {

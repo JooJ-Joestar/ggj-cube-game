@@ -106,6 +106,10 @@ export class GameUI {
     this.attacks.setQuickAttackEnabled(enabled);
   }
 
+  setSpecialEnabled(enabled: boolean) {
+    this.attacks.setSpecialEnabled(enabled);
+  }
+
   attachRemotePlayerLabel(id: string, name: string, mesh: Mesh) {
     let label = this.remoteLabels.get(id);
     if (!label) {
