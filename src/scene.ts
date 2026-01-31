@@ -82,6 +82,13 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
   let lastQuickAttackAt = 0;
   let nextQuickAttackReadyAt = 0;
   let quickAttackEnabled = true;
+  const getRandomSpawnPosition = () => {
+    const range = 2;
+    const x = Math.round((Math.random() * 2 - 1) * range);
+    const z = Math.round((Math.random() * 2 - 1) * range);
+    return new Vector3(x, player.mesh.position.y, z);
+  };
+  player.setPosition(getRandomSpawnPosition());
   const projectiles: Array<{
     mesh: any;
     direction: Vector3;
@@ -114,6 +121,7 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
       return remotePlayers.get(id) ?? null;
     }
     const remote = new Player(playerFactory, id, false);
+    remote.setPosition(getRandomSpawnPosition());
     remotePlayers.set(id, remote);
     return remote;
   };
@@ -203,6 +211,12 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
     if (id === localPlayerId) {
       player.setHealth(health);
       player.setInvincibleForSeconds(player.getDamageCooldownTime());
+      player.setPosition(getRandomSpawnPosition());
+    } else {
+      const remote = remotePlayers.get(id);
+      if (remote) {
+        remote.setPosition(getRandomSpawnPosition());
+      }
     }
     ui.updatePlayerHealth(id, health, 100);
   });
@@ -360,7 +374,10 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
       y: player.mesh.position.y,
       z: player.mesh.position.z
     });
-    ui.updateDebugInfo(colyseusConnection);
+    ui.updateDebugInfo(colyseusConnection, {
+      x: player.mesh.position.x,
+      z: player.mesh.position.z
+    });
     camera.position = player.mesh.position.add(cameraOffset);
     scene.render();
   });

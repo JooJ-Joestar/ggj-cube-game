@@ -6,6 +6,7 @@ export class DebugPanel {
   private roomInfo: TextBlock;
   private playerCount: TextBlock;
   private latency: TextBlock;
+  private position: TextBlock;
   private connectionLost: TextBlock;
 
   constructor(gui: AdvancedDynamicTexture) {
@@ -67,6 +68,16 @@ export class DebugPanel {
     this.latency.textVerticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
     this.panel.addControl(this.latency);
 
+    this.position = new TextBlock("position", "Pos: 0, 0");
+    this.position.fontSize = fontSize;
+    this.position.fontFamily = fontFamily;
+    this.position.height = fontHeight;
+    this.position.width = "100%";
+    this.position.color = "white";
+    this.position.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+    this.position.textVerticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
+    this.panel.addControl(this.position);
+
     this.connectionLost = new TextBlock("connectionLost", "Connection lost");
     this.connectionLost.fontSize = fontSize;
     this.connectionLost.fontFamily = fontFamily;
@@ -81,12 +92,15 @@ export class DebugPanel {
     debugGroup.addControl(this.panel);
   }
 
-  update(connection: ColyseusConnection) {
+  update(connection: ColyseusConnection, position?: { x: number; z: number }) {
     const roomName = connection.getRoomName();
     const roomId = connection.getRoomId();
     this.roomInfo.text = `Room: ${roomName} (${roomId})`;
     this.playerCount.text = `Players: ${connection.getPlayerCount()}`;
     this.latency.text = `Latency: ${connection.getLastLatency()}ms`;
+    if (position) {
+      this.position.text = `Pos: ${position.x.toFixed(1)}, ${position.z.toFixed(1)}`;
+    }
     this.connectionLost.isVisible = !connection.isConnected();
   }
 }

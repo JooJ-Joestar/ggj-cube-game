@@ -72,8 +72,8 @@ export class GameUI {
     return this.controls.getSelectedColor();
   }
 
-  updateDebugInfo(connection: ColyseusConnection) {
-    this.debugPanel.update(connection);
+  updateDebugInfo(connection: ColyseusConnection, position?: { x: number; z: number }) {
+    this.debugPanel.update(connection, position);
   }
 
   attachPlayerMesh(mesh: any) {
