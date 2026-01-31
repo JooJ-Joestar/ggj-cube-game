@@ -1,4 +1,4 @@
-import { Vector3, Mesh } from "babylonjs";
+import { Vector3, Mesh, Color3 } from "babylonjs";
 import { StandardMaterial } from "babylonjs";
 import { PlayerFactory } from "../factory/PlayerFactory";
 
@@ -21,6 +21,13 @@ export class Player {
 
   setPosition(position: Vector3) {
     this.mesh.position.copyFrom(position);
+  }
+
+  setColor(color: Color3) {
+    const material = this.mesh.material;
+    if (material && material instanceof StandardMaterial) {
+      material.diffuseColor = color;
+    }
   }
 
   setId(id: string) {

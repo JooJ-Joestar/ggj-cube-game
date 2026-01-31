@@ -4,7 +4,8 @@ import {
   Scene,
   Vector3,
   Mesh,
-  LinesMesh
+  LinesMesh,
+  StandardMaterial
 } from "babylonjs";
 import { Obstacle } from "../models/Obstacle";
 import { colyseusConnection } from "../connection";
@@ -39,6 +40,22 @@ export class PlayerCtl extends Player {
     "DRAWING_REDBULL_DURATION_SECONDS",
     10
   );
+  private readonly scoutSpeedMultiplier = this.getEnvNumber(
+    "DRAWING_SCOUT_SPEED_MULTIPLIER",
+    2
+  );
+  private readonly scoutProjectileSpeedMultiplier = this.getEnvNumber(
+    "DRAWING_SCOUT_PROJECTILE_SPEED_MULTIPLIER",
+    2
+  );
+  private readonly scoutProjectileDistanceMultiplier = this.getEnvNumber(
+    "DRAWING_SCOUT_PROJECTILE_DISTANCE_MULTIPLIER",
+    1.5
+  );
+  private scoutApplied = false;
+  private baseColor: Color3;
+  private scoutBaseQuickAttackSpeed: number | null = null;
+  private scoutBaseQuickAttackDistance: number | null = null;
   private pathLine: LinesMesh | null = null;
   private pathPoints: Vector3[] = [];
   private currentSegmentIndex = 0;
@@ -49,6 +66,14 @@ export class PlayerCtl extends Player {
   constructor(factory: PlayerFactory, obstacles: Obstacle[], id = "") {
     super(factory, id, true);
     this.obstacles = obstacles;
+    const material = this.mesh.material;
+    if (material && material instanceof StandardMaterial) {
+      this.baseColor = material.diffuseColor.clone();
+    } else {
+      this.baseColor = new Color3(0.2, 0.6, 1);
+    }
+    this.scoutBaseQuickAttackSpeed = this.getQuickAttackSpeed();
+    this.scoutBaseQuickAttackDistance = this.getQuickAttackDistance();
   }
 
   setTarget(point: Vector3) {
@@ -102,8 +127,9 @@ export class PlayerCtl extends Player {
     this.lastMoveDirection = direction.clone();
     const now = performance.now();
     const speedMultiplier = now < this.speedBoostUntilMs ? this.speedBoostMultiplier : 1;
+    const scoutMultiplier = this.scoutApplied ? this.scoutSpeedMultiplier : 1;
     const moveDistance = Math.min(
-      this.baseMaxSpeed * speedMultiplier * deltaSeconds,
+      this.baseMaxSpeed * scoutMultiplier * speedMultiplier * deltaSeconds,
       distance
     );
     const nextPosition = this.mesh.position.add(direction.scale(moveDistance));
@@ -210,6 +236,12 @@ export class PlayerCtl extends Player {
     if (template.name === "redbull") {
       this.applySpeedBoost(this.redbullSpeedMultiplier, this.redbullDurationSeconds);
     }
+    if (template.name === "scout") {
+      this.applyScoutBoost();
+    }
+    if (template.name === "engineer" || template.name === "soldier") {
+      this.resetScoutBoost();
+    }
     for (let row = 0; row < template.height; row++) {
       for (let col = 0; col < template.width; col++) {
         const srcCol = transform.flipX ? template.width - 1 - col : col;
@@ -228,6 +260,33 @@ export class PlayerCtl extends Player {
     const safeDuration = Number.isFinite(durationSeconds) ? Math.max(0, durationSeconds) : 0;
     this.speedBoostMultiplier = safeMultiplier;
     this.speedBoostUntilMs = performance.now() + safeDuration * 1000;
+  }
+
+  private applyScoutBoost() {
+    if (this.scoutApplied) {
+      return;
+    }
+    this.scoutApplied = true;
+    this.setColor(Color3.White());
+    const boostedSpeed =
+      (this.scoutBaseQuickAttackSpeed ?? this.getQuickAttackSpeed()) *
+      this.scoutProjectileSpeedMultiplier;
+    const boostedDistance =
+      (this.scoutBaseQuickAttackDistance ?? this.getQuickAttackDistance()) *
+      this.scoutProjectileDistanceMultiplier;
+    this.setQuickAttackParams(boostedDistance, boostedSpeed);
+  }
+
+  private resetScoutBoost() {
+    if (!this.scoutApplied) {
+      return;
+    }
+    this.scoutApplied = false;
+    this.setColor(this.baseColor);
+    this.setQuickAttackParams(
+      this.scoutBaseQuickAttackDistance ?? this.getQuickAttackDistance(),
+      this.scoutBaseQuickAttackSpeed ?? this.getQuickAttackSpeed()
+    );
   }
 
   private getEnvNumber(key: string, fallback: number) {

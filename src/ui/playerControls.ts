@@ -6,6 +6,7 @@ import {
   Grid
 } from "babylonjs-gui";
 import { Color3 } from "babylonjs";
+import { PALETTE_COLORS, PaletteColor } from "../drawingTemplates/palette";
 
 export type PlayerMode = "move" | "place" | "remove";
 
@@ -87,12 +88,12 @@ export class PlayerControls {
     palette.isPointerBlocker = false;
 
     const colors: Array<{ name: string; color: Color3 }> = [
-      { name: "Black", color: new Color3(0, 0, 0) },
-      { name: "Yellow", color: new Color3(1, 0.9, 0) },
-      { name: "Orange", color: new Color3(1, 0.55, 0) },
-      { name: "Blue", color: new Color3(0.1, 0.45, 1) },
-      { name: "DarkTeal", color: new Color3(0, 0.4, 0.45) },
-      { name: "LightGray", color: new Color3(0.8, 0.8, 0.8) }
+      { name: "Black", color: PALETTE_COLORS[PaletteColor.Black] },
+      { name: "Yellow", color: PALETTE_COLORS[PaletteColor.Yellow] },
+      { name: "Orange", color: PALETTE_COLORS[PaletteColor.Orange] },
+      { name: "Blue", color: PALETTE_COLORS[PaletteColor.Blue] },
+      { name: "DarkTeal", color: PALETTE_COLORS[PaletteColor.DarkTeal] },
+      { name: "LightGray", color: PALETTE_COLORS[PaletteColor.LightGray] }
     ];
 
     colors.forEach((entry, index) => {

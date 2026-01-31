@@ -15,7 +15,7 @@ export const PALETTE_COLORS: Record<PaletteColor, Color3> = {
   [PaletteColor.Orange]: new Color3(1, 0.55, 0),
   [PaletteColor.Blue]: new Color3(0.1, 0.45, 1),
   [PaletteColor.DarkTeal]: new Color3(0, 0.4, 0.45),
-  [PaletteColor.LightGray]: new Color3(0.8, 0.8, 0.8)
+  [PaletteColor.LightGray]: new Color3(1, 1, 1)
 };
 
 export const EMPTY_CELL = -1;
