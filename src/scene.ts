@@ -74,6 +74,7 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
   ui.attachPlayerMesh(player.mesh);
   const placedCubes = new Map<string, ColorCube>();
   let pendingPlacement: { position: Vector3; color: Color3 } | null = null;
+  let pendingRemoval: { position: Vector3 } | null = null;
   const gridKey = (position: Vector3) => `${position.x},${position.z}`;
   const remotePlayers = new Map<string, Player>();
   let localPlayerId = "";
@@ -190,6 +191,19 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
     placedCubes.set(key, cube);
   });
 
+  colyseusConnection.onCubeRemoved((payload) => {
+    if (payload.id === localPlayerId) {
+      return;
+    }
+    const position = new Vector3(payload.position.x, payload.position.y, payload.position.z);
+    const key = gridKey(position);
+    const existing = placedCubes.get(key);
+    if (existing) {
+      existing.mesh.dispose();
+      placedCubes.delete(key);
+    }
+  });
+
   colyseusConnection.onPlacedCubes(({ cubes }) => {
     cubes.forEach((cubeInfo) => {
       const position = new Vector3(
@@ -214,6 +228,7 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
     if (paused) {
       player.stopMovement();
       pendingPlacement = null;
+      pendingRemoval = null;
     }
   });
 
@@ -254,6 +269,26 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
 
   player.setDestinationCallback((position) => {
     if (!pendingPlacement) {
+      if (!pendingRemoval) {
+        return;
+      }
+      if (!positionMatches(position, pendingRemoval.position)) {
+        return;
+      }
+      const key = gridKey(pendingRemoval.position);
+      const existing = placedCubes.get(key);
+      if (existing) {
+        existing.mesh.dispose();
+        placedCubes.delete(key);
+        colyseusConnection.sendRemoveCube({
+          position: {
+            x: pendingRemoval.position.x,
+            y: pendingRemoval.position.y,
+            z: pendingRemoval.position.z
+          }
+        });
+      }
+      pendingRemoval = null;
       return;
     }
     if (!positionMatches(position, pendingPlacement.position)) {
@@ -334,9 +369,14 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
         );
         if (currentMode === "move") {
           player.setTarget(snapped);
-        } else {
+        } else if (currentMode === "place") {
           const selectedColor = ui.getSelectedColor();
+          pendingRemoval = null;
           pendingPlacement = { position: snapped, color: selectedColor };
+          player.setTarget(snapped);
+        } else if (currentMode === "remove") {
+          pendingPlacement = null;
+          pendingRemoval = { position: snapped };
           player.setTarget(snapped);
         }
       }

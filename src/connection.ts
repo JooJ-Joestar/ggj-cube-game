@@ -26,6 +26,10 @@ type PlaceCubePayload = {
   position: { x: number; y: number; z: number };
   color: { r: number; g: number; b: number };
 };
+type RemoveCubePayload = {
+  id: string;
+  position: { x: number; y: number; z: number };
+};
 type PlacedCubesPayload = {
   cubes: Array<{
     position: { x: number; y: number; z: number };
@@ -57,6 +61,7 @@ export class ColyseusConnection {
   private respawnListeners: Array<(payload: HealthUpdatePayload) => void> = [];
   private hitListeners: Array<(payload: PlayerHitPayload) => void> = [];
   private placeCubeListeners: Array<(payload: PlaceCubePayload) => void> = [];
+  private removeCubeListeners: Array<(payload: RemoveCubePayload) => void> = [];
   private placedCubesListeners: Array<(payload: PlacedCubesPayload) => void> = [];
   private matchStatus = MatchStatusCode.Play;
   private latestScoreboard: ScoreboardEntry[] = [];
@@ -174,6 +179,12 @@ export class ColyseusConnection {
         return;
       }
       this.placeCubeListeners.forEach((listener) => listener(message));
+    });
+    room.onMessage("cubeRemoved", (message: RemoveCubePayload) => {
+      if (!message?.id) {
+        return;
+      }
+      this.removeCubeListeners.forEach((listener) => listener(message));
     });
     room.onMessage("placedCubes", (message: PlacedCubesPayload) => {
       if (!message?.cubes) {
@@ -316,6 +327,10 @@ export class ColyseusConnection {
     this.placeCubeListeners.push(callback);
   }
 
+  onCubeRemoved(callback: (payload: RemoveCubePayload) => void) {
+    this.removeCubeListeners.push(callback);
+  }
+
   onPlacedCubes(callback: (payload: PlacedCubesPayload) => void) {
     this.placedCubesListeners.push(callback);
   }
@@ -379,6 +394,13 @@ export class ColyseusConnection {
       return;
     }
     this.room.send("placeCube", payload);
+  }
+
+  sendRemoveCube(payload: { position: { x: number; y: number; z: number } }) {
+    if (!this.room) {
+      return;
+    }
+    this.room.send("removeCube", payload);
   }
 }
 

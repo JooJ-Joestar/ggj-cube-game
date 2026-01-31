@@ -103,6 +103,20 @@ export class MyRoom extends Room<MyRoomState> {
     );
 
     this.onMessage(
+      "removeCube",
+      (client, message: { position?: { x: number; y: number; z: number } }) => {
+        if (!message?.position) {
+          return;
+        }
+        this.removePlacedCube(message.position);
+        this.broadcast("cubeRemoved", {
+          id: client.sessionId,
+          position: message.position
+        });
+      }
+    );
+
+    this.onMessage(
       "playerHealthUpdate",
       (client, message: { id?: string; health?: number }) => {
         const id = message?.id;
@@ -277,5 +291,12 @@ export class MyRoom extends Room<MyRoomState> {
       return;
     }
     this.placedCubes.push({ position, color });
+  }
+
+  private removePlacedCube(position: { x: number; y: number; z: number }) {
+    const key = `${position.x},${position.z}`;
+    this.placedCubes = this.placedCubes.filter(
+      (cube) => `${cube.position.x},${cube.position.z}` !== key
+    );
   }
 }

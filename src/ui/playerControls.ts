@@ -7,12 +7,13 @@ import {
 } from "babylonjs-gui";
 import { Color3 } from "babylonjs";
 
-export type PlayerMode = "move" | "place";
+export type PlayerMode = "move" | "place" | "remove";
 
 export class PlayerControls {
   private mode: PlayerMode = "move";
   private moveButton: Button;
   private placeButton: Button;
+  private removeButton: Button;
   private colorButton: Button;
   private scoreboardButton: Button;
   private selectedColor = new Color3(1, 0.4, 0);
@@ -37,6 +38,7 @@ export class PlayerControls {
 
     this.moveButton = this.createButton("Move", () => this.setMode("move"));
     this.placeButton = this.createButton("Place", () => this.setMode("place"));
+    this.removeButton = this.createButton("Remove block", () => this.setMode("remove"));
     this.colorButton = this.createButton("Color", () => this.openColorWheel());
     this.colorButton.isVisible = false;
     this.scoreboardButton = this.createScoreboardButton("Show scoreboard", () =>
@@ -45,6 +47,7 @@ export class PlayerControls {
 
     controlsStack.addControl(this.moveButton);
     controlsStack.addControl(this.placeButton);
+    controlsStack.addControl(this.removeButton);
     controlsStack.addControl(this.colorButton);
 
     this.updateButtonStates();
@@ -167,6 +170,7 @@ export class PlayerControls {
   private updateButtonStates() {
     this.styleToggle(this.moveButton, this.mode === "move");
     this.styleToggle(this.placeButton, this.mode === "place");
+    this.styleToggle(this.removeButton, this.mode === "remove");
   }
 
   private styleToggle(button: Button, active: boolean) {
