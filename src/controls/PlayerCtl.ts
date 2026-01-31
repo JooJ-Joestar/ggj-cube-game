@@ -28,7 +28,17 @@ type DrawingAccess = {
 export class PlayerCtl extends Player {
   private target: Vector3 | null = null;
   private readonly obstacles: Obstacle[];
-  private readonly maxSpeed = 8; // units per second
+  private readonly baseMaxSpeed = 8; // units per second
+  private speedBoostUntilMs = 0;
+  private speedBoostMultiplier = 1;
+  private readonly redbullSpeedMultiplier = this.getEnvNumber(
+    "DRAWING_REDBULL_SPEED_MULTIPLIER",
+    2
+  );
+  private readonly redbullDurationSeconds = this.getEnvNumber(
+    "DRAWING_REDBULL_DURATION_SECONDS",
+    10
+  );
   private pathLine: LinesMesh | null = null;
   private pathPoints: Vector3[] = [];
   private currentSegmentIndex = 0;
@@ -90,7 +100,12 @@ export class PlayerCtl extends Player {
 
     direction.normalize();
     this.lastMoveDirection = direction.clone();
-    const moveDistance = Math.min(this.maxSpeed * deltaSeconds, distance);
+    const now = performance.now();
+    const speedMultiplier = now < this.speedBoostUntilMs ? this.speedBoostMultiplier : 1;
+    const moveDistance = Math.min(
+      this.baseMaxSpeed * speedMultiplier * deltaSeconds,
+      distance
+    );
     const nextPosition = this.mesh.position.add(direction.scale(moveDistance));
 
       if (this.collidesWithObstacle(nextPosition)) {
@@ -192,6 +207,9 @@ export class PlayerCtl extends Player {
     if (!this.drawingAccess) {
       return;
     }
+    if (template.name === "redbull") {
+      this.applySpeedBoost(this.redbullSpeedMultiplier, this.redbullDurationSeconds);
+    }
     for (let row = 0; row < template.height; row++) {
       for (let col = 0; col < template.width; col++) {
         const srcCol = transform.flipX ? template.width - 1 - col : col;
@@ -203,6 +221,22 @@ export class PlayerCtl extends Player {
         this.drawingAccess.removeCubeAt(position);
       }
     }
+  }
+
+  private applySpeedBoost(multiplier: number, durationSeconds: number) {
+    const safeMultiplier = Number.isFinite(multiplier) && multiplier > 0 ? multiplier : 1;
+    const safeDuration = Number.isFinite(durationSeconds) ? Math.max(0, durationSeconds) : 0;
+    this.speedBoostMultiplier = safeMultiplier;
+    this.speedBoostUntilMs = performance.now() + safeDuration * 1000;
+  }
+
+  private getEnvNumber(key: string, fallback: number) {
+    const raw = process.env[key];
+    if (raw === undefined) {
+      return fallback;
+    }
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : fallback;
   }
 
   private collidesWithObstacle(nextPosition: Vector3) {

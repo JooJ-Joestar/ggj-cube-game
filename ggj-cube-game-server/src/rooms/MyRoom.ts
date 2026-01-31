@@ -11,6 +11,7 @@ export class MyRoom extends Room<MyRoomState> {
   static readonly MATCH_PAUSE_STATUS_CODE = 2;
 
   maxClients = 4;
+  autoDispose = false;
   state = new MyRoomState();
   private playerNames = new Map<string, string>();
   private playerScores = new Map<string, number>();
