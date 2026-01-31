@@ -14,6 +14,7 @@ export class MyRoom extends Room<MyRoomState> {
   state = new MyRoomState();
   private playerNames = new Map<string, string>();
   private playerScores = new Map<string, number>();
+  private playerHealth = new Map<string, number>();
   private matchPlayDuration = 60;
   private matchPauseDuration = 15;
   private matchLoopAbort = false;
@@ -75,6 +76,49 @@ export class MyRoom extends Room<MyRoomState> {
         });
       }
     );
+
+    this.onMessage(
+      "playerHealthUpdate",
+      (client, message: { id?: string; health?: number }) => {
+        const id = message?.id;
+        if (!id || typeof message.health !== "number") {
+          return;
+        }
+        this.playerHealth.set(id, Math.max(0, Math.round(message.health)));
+        this.broadcast("playerHealthUpdate", { id, health: message.health });
+      }
+    );
+
+    this.onMessage(
+      "addPlayerScore",
+      (client, message: { id?: string; amount?: number }) => {
+        const id = message?.id;
+        const amount = Number(message?.amount);
+        if (!id || !Number.isFinite(amount)) {
+          return;
+        }
+        const next = (this.playerScores.get(id) ?? 0) + Math.max(0, Math.round(amount));
+        this.playerScores.set(id, next);
+        this.broadcastScoreboard();
+      }
+    );
+
+    this.onMessage("playerHit", (client, message: { id?: string }) => {
+      const id = message?.id;
+      if (!id) {
+        return;
+      }
+      this.broadcast("playerHit", { id });
+    });
+
+    this.onMessage("respawnClient", (client, message: { id?: string }) => {
+      const id = message?.id ?? client.sessionId;
+      if (!id) {
+        return;
+      }
+      this.playerHealth.set(id, 100);
+      this.broadcast("playerRespawn", { id, health: 100 });
+    });
   }
 
   async onJoin(client: Client, options: any) {
@@ -85,14 +129,20 @@ export class MyRoom extends Room<MyRoomState> {
     });
     this.playerNames.set(client.sessionId, playerName);
     this.playerScores.set(client.sessionId, 0);
+    this.playerHealth.set(client.sessionId, 100);
     for (const [otherId, otherName] of this.playerNames.entries()) {
       if (otherId !== client.sessionId) {
-        client.send("playerJoined", { id: otherId, name: otherName });
+        client.send("playerJoined", {
+          id: otherId,
+          name: otherName,
+          health: this.playerHealth.get(otherId) ?? 100
+        });
       }
     }
     this.broadcast("playerJoined", {
       id: client.sessionId,
-      name: playerName
+      name: playerName,
+      health: this.playerHealth.get(client.sessionId) ?? 100
     });
     console.log(client.sessionId, "joined as", playerName);
   }
@@ -100,6 +150,7 @@ export class MyRoom extends Room<MyRoomState> {
   onLeave(client: Client, consented: boolean) {
     this.playerNames.delete(client.sessionId);
     this.playerScores.delete(client.sessionId);
+    this.playerHealth.delete(client.sessionId);
     this.broadcast("playerLeft", { id: client.sessionId });
     console.log(client.sessionId, "left!");
   }

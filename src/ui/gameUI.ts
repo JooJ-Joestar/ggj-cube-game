@@ -8,6 +8,7 @@ import { MatchTimer } from "./timer";
 import { MatchStatusCode } from "../connection";
 import { ScoreboardPanel } from "./scoreboard";
 import { PlayerAttacks } from "./playerAttacks";
+import { PlayerHealthBar } from "./playerHealthBar";
 
 export class GameUI {
   private gui: AdvancedDynamicTexture;
@@ -18,6 +19,7 @@ export class GameUI {
   private scoreboard: ScoreboardPanel;
   private attacks: PlayerAttacks;
   private remoteLabels = new Map<string, PlayerLabel>();
+  private healthBars = new Map<string, PlayerHealthBar>();
   public onModeChange: (mode: PlayerMode) => void = () => {};
   public onQuickAttack: () => void = () => {};
 
@@ -78,6 +80,26 @@ export class GameUI {
     this.label.attachToMesh(mesh);
   }
 
+  attachPlayerHealthBar(id: string, mesh: Mesh, maxHealth: number) {
+    let bar = this.healthBars.get(id);
+    if (!bar) {
+      bar = new PlayerHealthBar(this.gui);
+      this.healthBars.set(id, bar);
+    }
+    bar.attachToMesh(mesh);
+    bar.setMaxHealth(maxHealth);
+    bar.setHealth(maxHealth);
+  }
+
+  updatePlayerHealth(id: string, health: number, maxHealth: number) {
+    const bar = this.healthBars.get(id);
+    if (!bar) {
+      return;
+    }
+    bar.setMaxHealth(maxHealth);
+    bar.setHealth(health);
+  }
+
   setQuickAttackEnabled(enabled: boolean) {
     this.attacks.setQuickAttackEnabled(enabled);
   }
@@ -99,6 +121,15 @@ export class GameUI {
     }
     this.remoteLabels.delete(id);
     label.dispose();
+  }
+
+  removePlayerHealthBar(id: string) {
+    const bar = this.healthBars.get(id);
+    if (!bar) {
+      return;
+    }
+    this.healthBars.delete(id);
+    bar.dispose();
   }
 }
 

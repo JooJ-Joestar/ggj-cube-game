@@ -63,8 +63,8 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
   gridOverlay.renderingGroupId = 0;
 
   const obstacles: Obstacle[] = [];
-  obstacles.push(new Obstacle(scene, new Vector3(3, 0, 3)));
-  obstacles.push(new Obstacle(scene, new Vector3(-4, 0, -1)));
+  // obstacles.push(new Obstacle(scene, new Vector3(3, 0, 3)));
+  // obstacles.push(new Obstacle(scene, new Vector3(-4, 0, -1)));
 
   const playerFactory = new PlayerFactory(scene);
   const player = new PlayerCtl(playerFactory, obstacles);
@@ -76,6 +76,7 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
   let pendingPlacement: { position: Vector3; color: Color3 } | null = null;
   const gridKey = (position: Vector3) => `${position.x},${position.z}`;
   const remotePlayers = new Map<string, Player>();
+  let localPlayerId = "";
   let currentMode: PlayerMode = ui.getMode();
   let matchPaused = colyseusConnection.isMatchPaused();
   let lastQuickAttackAt = 0;
@@ -86,12 +87,14 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
     direction: Vector3;
     remaining: number;
     speed: number;
+    ownerId: string;
   }> = [];
   const spawnQuickAttack = (
     position: Vector3,
     direction: Vector3,
     distance: number,
-    speed: number
+    speed: number,
+    ownerId: string
   ) => {
     const size = 0.5;
     const attack = MeshBuilder.CreateBox("quickAttack", { size }, scene);
@@ -101,7 +104,8 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
       mesh: attack,
       direction,
       remaining: distance,
-      speed
+      speed,
+      ownerId
     });
   };
 
@@ -114,13 +118,17 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
     return remote;
   };
 
-  colyseusConnection.onRemotePlayerJoined(({ id, name }) => {
+  colyseusConnection.onRemotePlayerJoined(({ id, name, health }) => {
     if (id === colyseusConnection.getPlayerId()) {
       return;
     }
     const remote = spawnRemotePlayer(id);
     if (remote) {
       ui.attachRemotePlayerLabel(id, name, remote.mesh);
+      ui.attachPlayerHealthBar(id, remote.mesh, 100);
+      if (typeof health === "number") {
+        ui.updatePlayerHealth(id, health, 100);
+      }
     }
   });
 
@@ -140,6 +148,7 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
     remote.mesh.dispose();
     remotePlayers.delete(id);
     ui.removeRemotePlayerLabel(id);
+    ui.removePlayerHealthBar(id);
   });
 
   colyseusConnection.onRemoteQuickAttack((payload) => {
@@ -155,7 +164,23 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
     const origin = new Vector3(payload.position.x, payload.position.y, payload.position.z);
     const distance = payload.distance ?? player.getQuickAttackDistance();
     const speed = payload.speed ?? player.getQuickAttackSpeed();
-    spawnQuickAttack(origin, direction, distance, speed);
+    spawnQuickAttack(origin, direction, distance, speed, payload.id);
+  });
+
+  colyseusConnection.onRemoteQuickAttack((payload) => {
+    const direction = new Vector3(
+      payload.direction.x,
+      payload.direction.y,
+      payload.direction.z
+    );
+    if (direction.lengthSquared() < 0.0001) {
+      direction.copyFromFloats(0, 0, 1);
+    }
+    direction.normalize();
+    const origin = new Vector3(payload.position.x, payload.position.y, payload.position.z);
+    const distance = payload.distance ?? player.getQuickAttackDistance();
+    const speed = payload.speed ?? player.getQuickAttackSpeed();
+    spawnQuickAttack(origin, direction, distance, speed, payload.id);
   });
 
   colyseusConnection.onMatchStatusChange((status) => {
@@ -164,6 +189,32 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
     if (paused) {
       player.stopMovement();
       pendingPlacement = null;
+    }
+  });
+
+  colyseusConnection.onPlayerHealthUpdate(({ id, health }) => {
+    if (id === localPlayerId) {
+      player.setHealth(health);
+    }
+    ui.updatePlayerHealth(id, health, 100);
+  });
+
+  colyseusConnection.onPlayerRespawn(({ id, health }) => {
+    if (id === localPlayerId) {
+      player.setHealth(health);
+      player.setInvincibleForSeconds(player.getDamageCooldownTime());
+    }
+    ui.updatePlayerHealth(id, health, 100);
+  });
+
+  colyseusConnection.onPlayerHit(({ id }) => {
+    if (id === localPlayerId) {
+      player.setInvincibleForSeconds(player.getDamageCooldownTime());
+      return;
+    }
+    const remote = remotePlayers.get(id);
+    if (remote) {
+      remote.setInvincibleForSeconds(remote.getDamageCooldownTime());
     }
   });
 
@@ -202,6 +253,7 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
     nextQuickAttackReadyAt = now + cooldown;
     quickAttackEnabled = cooldown <= 0;
     ui.setQuickAttackEnabled(quickAttackEnabled);
+    player.setDamageCooldownTime(0);
     const direction = player.getFacingDirection();
     direction.y = 0;
     if (direction.lengthSquared() < 0.0001) {
@@ -211,7 +263,9 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
     const distance = player.getQuickAttackDistance();
     const speed = player.getQuickAttackSpeed();
     const origin = player.mesh.position.clone();
-    spawnQuickAttack(origin, direction, distance, speed);
+    if (localPlayerId) {
+      spawnQuickAttack(origin, direction, distance, speed, localPlayerId);
+    }
     colyseusConnection.sendQuickAttack({
       position: { x: origin.x, y: origin.y, z: origin.z },
       direction: { x: direction.x, y: direction.y, z: direction.z },
@@ -251,6 +305,10 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
     const now = performance.now();
     camera.setTarget(player.mesh.position);
     player.update(deltaSeconds);
+    player.updateInvincibility();
+    for (const remote of remotePlayers.values()) {
+      remote.updateInvincibility();
+    }
     if (!quickAttackEnabled && now >= nextQuickAttackReadyAt) {
       quickAttackEnabled = true;
       ui.setQuickAttackEnabled(true);
@@ -261,6 +319,36 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
         const step = Math.min(projectile.speed * deltaSeconds, projectile.remaining);
         projectile.mesh.position.addInPlace(projectile.direction.scale(step));
         projectile.remaining -= step;
+        if (
+          projectile.ownerId &&
+          projectile.ownerId !== localPlayerId &&
+          !player.isInvincible() &&
+          projectile.mesh.intersectsMesh(player.mesh, false)
+        ) {
+          const damage = player.getQuickAttackDamage();
+          const applied = player.applyDamage(damage);
+          if (applied > 0) {
+            ui.updatePlayerHealth(localPlayerId, player.getHealth(), 100);
+            colyseusConnection.sendPlayerHealthUpdate({
+              id: localPlayerId,
+              health: player.getHealth()
+            });
+            colyseusConnection.sendPlayerHit({ id: localPlayerId });
+            colyseusConnection.sendAddPlayerScore({
+              id: projectile.ownerId,
+              amount: applied
+            });
+            if (player.getDamageCooldownTime() > 0) {
+              player.setInvincibleForSeconds(player.getDamageCooldownTime());
+            }
+            if (player.getHealth() <= 0) {
+              colyseusConnection.sendRespawn({ id: localPlayerId });
+            }
+          }
+          projectile.mesh.dispose();
+          projectiles.splice(i, 1);
+          continue;
+        }
         if (projectile.remaining <= 0) {
           projectile.mesh.dispose();
           projectiles.splice(i, 1);
@@ -280,7 +368,11 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
   window.addEventListener("resize", () => engine.resize());
 
   colyseusConnection.connect().then(() => {
-    player.setId(colyseusConnection.getPlayerId());
+    localPlayerId = colyseusConnection.getPlayerId();
+    player.setId(localPlayerId);
+    player.setInvincibleForSeconds(player.getDamageCooldownTime());
+    ui.attachPlayerHealthBar(localPlayerId, player.mesh, 100);
+    ui.updatePlayerHealth(localPlayerId, player.getHealth(), 100);
   });
   return scene;
 }

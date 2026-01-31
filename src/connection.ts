@@ -6,7 +6,7 @@ type RoomWithClients<State = unknown> = Room<State> & {
 
 const DEFAULT_URL = "ws://localhost:2567";
 
-type RemotePlayerInfo = { id: string; name: string };
+type RemotePlayerInfo = { id: string; name: string; health?: number };
 type RemotePlayerMovement = { id: string; position: { x: number; y: number; z: number } };
 type MatchTimePayload = { time: number };
 type ScoreboardEntry = { id: string; name: string; score: number };
@@ -19,6 +19,8 @@ type QuickAttackPayload = {
   speed?: number;
   distance?: number;
 };
+type HealthUpdatePayload = { id: string; health: number };
+type PlayerHitPayload = { id: string };
 
 export enum MatchStatusCode {
   Play = 1,
@@ -40,6 +42,9 @@ export class ColyseusConnection {
   private matchStatusListeners: Array<(status: number) => void> = [];
   private scoreboardListeners: Array<(entries: ScoreboardEntry[]) => void> = [];
   private quickAttackListeners: Array<(payload: QuickAttackPayload) => void> = [];
+  private healthListeners: Array<(payload: HealthUpdatePayload) => void> = [];
+  private respawnListeners: Array<(payload: HealthUpdatePayload) => void> = [];
+  private hitListeners: Array<(payload: PlayerHitPayload) => void> = [];
   private matchStatus = MatchStatusCode.Play;
   private latestScoreboard: ScoreboardEntry[] = [];
 
@@ -132,6 +137,24 @@ export class ColyseusConnection {
         return;
       }
       this.quickAttackListeners.forEach((listener) => listener(message));
+    });
+    room.onMessage("playerHealthUpdate", (message: HealthUpdatePayload) => {
+      if (!message?.id || typeof message.health !== "number") {
+        return;
+      }
+      this.healthListeners.forEach((listener) => listener(message));
+    });
+    room.onMessage("playerRespawn", (message: HealthUpdatePayload) => {
+      if (!message?.id || typeof message.health !== "number") {
+        return;
+      }
+      this.respawnListeners.forEach((listener) => listener(message));
+    });
+    room.onMessage("playerHit", (message: PlayerHitPayload) => {
+      if (!message?.id) {
+        return;
+      }
+      this.hitListeners.forEach((listener) => listener(message));
     });
 
     room.onMessage("playerJoined", (message: RemotePlayerInfo) => {
@@ -252,6 +275,18 @@ export class ColyseusConnection {
     this.quickAttackListeners.push(callback);
   }
 
+  onPlayerHealthUpdate(callback: (payload: HealthUpdatePayload) => void) {
+    this.healthListeners.push(callback);
+  }
+
+  onPlayerRespawn(callback: (payload: HealthUpdatePayload) => void) {
+    this.respawnListeners.push(callback);
+  }
+
+  onPlayerHit(callback: (payload: PlayerHitPayload) => void) {
+    this.hitListeners.push(callback);
+  }
+
   isMatchPaused() {
     return this.matchStatus === MatchStatusCode.Pause;
   }
@@ -273,6 +308,34 @@ export class ColyseusConnection {
       return;
     }
     this.room.send("quickAttack", payload);
+  }
+
+  sendPlayerHealthUpdate(payload: { id: string; health: number }) {
+    if (!this.room) {
+      return;
+    }
+    this.room.send("playerHealthUpdate", payload);
+  }
+
+  sendAddPlayerScore(payload: { id: string; amount: number }) {
+    if (!this.room) {
+      return;
+    }
+    this.room.send("addPlayerScore", payload);
+  }
+
+  sendRespawn(payload: { id: string }) {
+    if (!this.room) {
+      return;
+    }
+    this.room.send("respawnClient", payload);
+  }
+
+  sendPlayerHit(payload: { id: string }) {
+    if (!this.room) {
+      return;
+    }
+    this.room.send("playerHit", payload);
   }
 }
 
