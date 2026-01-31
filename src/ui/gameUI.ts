@@ -4,12 +4,14 @@ import { PlayerLabel } from "../models/PlayerLabel";
 import { ColyseusConnection } from "../connection";
 import { PlayerControls, PlayerMode } from "./playerControls";
 import { DebugPanel } from "./debugPanel";
+import { MatchTimer } from "./timer";
 
 export class GameUI {
   private gui: AdvancedDynamicTexture;
   private controls: PlayerControls;
   private debugPanel: DebugPanel;
   private label: PlayerLabel;
+  private timer: MatchTimer;
   public onModeChange: (mode: PlayerMode) => void = () => {};
 
   constructor(scene: Scene, connection: ColyseusConnection) {
@@ -25,6 +27,9 @@ export class GameUI {
     connection.onPlayerNameAssigned((name) => {
       this.label.setName(name);
     });
+
+    this.timer = new MatchTimer(this.gui);
+    connection.onMatchTimeChange((seconds) => this.timer.update(seconds));
 
     this.debugPanel = new DebugPanel(this.gui);
     this.updateDebugInfo(connection);

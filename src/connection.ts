@@ -8,6 +8,7 @@ const DEFAULT_URL = "ws://localhost:2567";
 
 type RemotePlayerInfo = { id: string; name: string };
 type RemotePlayerMovement = { id: string; position: { x: number; y: number; z: number } };
+type MatchTimePayload = { time: number };
 
 export class ColyseusConnection {
   private client: Client | null = null;
@@ -20,6 +21,7 @@ export class ColyseusConnection {
   private remotePlayerJoinListeners: Array<(info: RemotePlayerInfo) => void> = [];
   private remotePlayerMoveListeners: Array<(movement: RemotePlayerMovement) => void> = [];
   private remotePlayerLeaveListeners: Array<(id: string) => void> = [];
+  private matchTimeListeners: Array<(seconds: number) => void> = [];
 
   constructor() {
     this.serverUrl = process.env.COLYSEUS_URL || DEFAULT_URL;
@@ -85,6 +87,12 @@ export class ColyseusConnection {
     room.onMessage("assignName", (message: { name?: string }) => {
       if (message?.name) {
         this.setPlayerName(message.name);
+      }
+    });
+
+    room.onMessage("matchTimeChange", (message: MatchTimePayload) => {
+      if (typeof message.time === "number") {
+        this.matchTimeListeners.forEach((listener) => listener(message.time));
       }
     });
 
@@ -184,6 +192,10 @@ export class ColyseusConnection {
 
   onRemotePlayerLeft(callback: (id: string) => void) {
     this.remotePlayerLeaveListeners.push(callback);
+  }
+
+  onMatchTimeChange(callback: (seconds: number) => void) {
+    this.matchTimeListeners.push(callback);
   }
 
   sendPlayerMovement(position: { x: number; y: number; z: number }) {

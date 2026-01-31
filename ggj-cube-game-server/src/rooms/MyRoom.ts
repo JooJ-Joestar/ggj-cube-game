@@ -7,11 +7,22 @@ import {
 import { MyRoomState } from "./schema/MyRoomState";
 
 export class MyRoom extends Room<MyRoomState> {
+  static readonly MATCH_PLAY_STATUS_CODE = 1;
+  static readonly MATCH_PAUSE_STATUS_CODE = 2;
+
   maxClients = 4;
   state = new MyRoomState();
   private playerNames = new Map<string, string>();
+  private matchPlayDuration = 60;
+  private matchPauseDuration = 15;
+  private matchLoopAbort = false;
+  private matchLoopRunning = false;
 
-  onCreate (options: any) {
+  onCreate(options: any) {
+    this.matchPlayDuration = this.getEnvDuration("MATCH_PLAY_TIME", 60);
+    this.matchPauseDuration = this.getEnvDuration("MATCH_PAUSE_TIME", 15);
+    this.runMatchLoop();
+
     this.onMessage("type", (client, message) => {
       //
       // handle "type" message
@@ -30,7 +41,7 @@ export class MyRoom extends Room<MyRoomState> {
     });
   }
 
-  onJoin (client: Client, options: any) {
+  async onJoin(client: Client, options: any) {
     const playerName = uniqueNamesGenerator({
       dictionaries: [adjectives, animals],
       separator: " ",
@@ -49,14 +60,62 @@ export class MyRoom extends Room<MyRoomState> {
     console.log(client.sessionId, "joined as", playerName);
   }
 
-  onLeave (client: Client, consented: boolean) {
+  onLeave(client: Client, consented: boolean) {
     this.playerNames.delete(client.sessionId);
     this.broadcast("playerLeft", { id: client.sessionId });
     console.log(client.sessionId, "left!");
   }
 
   onDispose() {
+    this.matchLoopAbort = true;
     console.log("room", this.roomId, "disposing...");
+  }
+
+  private async runMatchLoop() {
+    if (this.matchLoopRunning) {
+      return;
+    }
+    this.matchLoopRunning = true;
+    try {
+      while (!this.matchLoopAbort) {
+        await this.runPhase(MyRoom.MATCH_PLAY_STATUS_CODE, this.matchPlayDuration);
+        if (this.matchLoopAbort) {
+          break;
+        }
+        await this.runPhase(MyRoom.MATCH_PAUSE_STATUS_CODE, this.matchPauseDuration);
+      }
+    } catch (err) {
+      console.warn("Match timer loop stopped", err);
+    } finally {
+      this.matchLoopRunning = false;
+    }
+  }
+
+  private async runPhase(statusCode: number, durationSeconds: number) {
+    this.broadcast("matchStatusChange", { status: statusCode });
+    const ticks = Math.max(0, Math.round(durationSeconds));
+    for (let remaining = ticks; remaining >= 0; remaining--) {
+      if (this.matchLoopAbort) {
+        return;
+      }
+      this.broadcast("matchTimeChange", { time: remaining });
+      if (remaining === 0) {
+        break;
+      }
+      await this.delay(1000);
+    }
+  }
+
+  private delay(ms: number) {
+    return new Promise<void>((resolve) => setTimeout(resolve, ms));
+  }
+
+  private getEnvDuration(key: string, fallback: number) {
+    const value = Number(process.env[key]);
+    if (!Number.isFinite(value) || value <= 0) {
+      return fallback;
+    }
+    return Math.round(value);
   }
 
   private replyWithName(client: Client) {
