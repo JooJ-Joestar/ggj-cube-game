@@ -21,6 +21,7 @@ export class ScoreboardPanel {
     this.container.cornerRadius = 12;
     this.container.background = "rgba(0, 0, 0, 0.75)";
     this.container.thickness = 0;
+    this.container.zIndex = 50;
     this.container.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
     this.container.verticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
     this.container.paddingLeft = "10px";
@@ -62,7 +63,7 @@ export class ScoreboardPanel {
   }
 
   update(entries: ScoreboardEntry[]) {
-    this.entriesPanel.children?.forEach((child) => child.dispose());
+    this.entriesPanel.clearControls();
     entries.forEach((entry) => {
       const row = new TextBlock(
         `scoreboard-row-${entry.name}`,
