@@ -5,6 +5,7 @@ import { ColyseusConnection } from "../connection";
 import { PlayerControls, PlayerMode } from "./playerControls";
 import { DebugPanel } from "./debugPanel";
 import { MatchTimer } from "./timer";
+import { MatchStatusCode } from "../connection";
 
 export class GameUI {
   private gui: AdvancedDynamicTexture;
@@ -30,6 +31,10 @@ export class GameUI {
 
     this.timer = new MatchTimer(this.gui);
     connection.onMatchTimeChange((seconds) => this.timer.update(seconds));
+    connection.onMatchStatusChange((status) => {
+      const prefix = status === MatchStatusCode.Play ? "Time left" : "Next match";
+      this.timer.setLabelPrefix(prefix);
+    });
 
     this.debugPanel = new DebugPanel(this.gui);
     this.updateDebugInfo(connection);

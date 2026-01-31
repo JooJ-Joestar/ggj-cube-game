@@ -30,6 +30,9 @@ export class PlayerCtl extends Player {
     snappedPoint.x = Math.round(snappedPoint.x);
     snappedPoint.z = Math.round(snappedPoint.z);
     snappedPoint.y = this.mesh.position.y;
+    if (colyseusConnection.isMatchPaused()) {
+      return;
+    }
     this.target = snappedPoint;
     this.pathPoints = this.buildPath(this.mesh.position.clone(), this.target);
     this.currentSegmentIndex = 1;
@@ -43,6 +46,9 @@ export class PlayerCtl extends Player {
 
   update(deltaSeconds: number) {
     if (colyseusConnection.shouldPauseUpdates()) {
+      return;
+    }
+    if (colyseusConnection.isMatchPaused()) {
       return;
     }
     if (this.pathPoints.length === 0 || this.currentSegmentIndex >= this.pathPoints.length) {
@@ -66,12 +72,19 @@ export class PlayerCtl extends Player {
     const moveDistance = Math.min(this.maxSpeed * deltaSeconds, distance);
     const nextPosition = this.mesh.position.add(direction.scale(moveDistance));
 
-    if (this.collidesWithObstacle(nextPosition)) {
-      this.target = null;
-      return;
-    }
+      if (this.collidesWithObstacle(nextPosition)) {
+        this.target = null;
+        return;
+      }
 
     this.mesh.position = nextPosition;
+  }
+
+  stopMovement() {
+    this.target = null;
+    this.pathPoints = [];
+    this.currentSegmentIndex = 0;
+    this.clearPathLine();
   }
 
   private collidesWithObstacle(nextPosition: Vector3) {

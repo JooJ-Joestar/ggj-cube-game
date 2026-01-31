@@ -9,6 +9,12 @@ const DEFAULT_URL = "ws://localhost:2567";
 type RemotePlayerInfo = { id: string; name: string };
 type RemotePlayerMovement = { id: string; position: { x: number; y: number; z: number } };
 type MatchTimePayload = { time: number };
+type MatchStatusPayload = { status: number };
+
+export enum MatchStatusCode {
+  Play = 1,
+  Pause = 2
+}
 
 export class ColyseusConnection {
   private client: Client | null = null;
@@ -22,6 +28,8 @@ export class ColyseusConnection {
   private remotePlayerMoveListeners: Array<(movement: RemotePlayerMovement) => void> = [];
   private remotePlayerLeaveListeners: Array<(id: string) => void> = [];
   private matchTimeListeners: Array<(seconds: number) => void> = [];
+  private matchStatusListeners: Array<(status: number) => void> = [];
+  private matchStatus = MatchStatusCode.Play;
 
   constructor() {
     this.serverUrl = process.env.COLYSEUS_URL || DEFAULT_URL;
@@ -93,6 +101,12 @@ export class ColyseusConnection {
     room.onMessage("matchTimeChange", (message: MatchTimePayload) => {
       if (typeof message.time === "number") {
         this.matchTimeListeners.forEach((listener) => listener(message.time));
+      }
+    });
+    room.onMessage("matchStatusChange", (message: MatchStatusPayload) => {
+      if (typeof message.status === "number") {
+        this.matchStatus = message.status;
+        this.matchStatusListeners.forEach((listener) => listener(message.status));
       }
     });
 
@@ -196,6 +210,15 @@ export class ColyseusConnection {
 
   onMatchTimeChange(callback: (seconds: number) => void) {
     this.matchTimeListeners.push(callback);
+  }
+
+  onMatchStatusChange(callback: (status: number) => void) {
+    this.matchStatusListeners.push(callback);
+    callback(this.matchStatus);
+  }
+
+  isMatchPaused() {
+    return this.matchStatus === MatchStatusCode.Pause;
   }
 
   sendPlayerMovement(position: { x: number; y: number; z: number }) {

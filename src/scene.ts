@@ -15,7 +15,7 @@ import { Player } from "./models/Player";
 import { PlayerCtl } from "./controls/PlayerCtl";
 import { ColorCube } from "./models/ColorCube";
 import { GameUI, PlayerMode } from "./ui/gameUI";
-import { colyseusConnection } from "./connection";
+import { colyseusConnection, MatchStatusCode } from "./connection";
 import { PlayerFactory } from "./factory/PlayerFactory";
 
 export function createScene(canvas: HTMLCanvasElement): Scene {
@@ -75,8 +75,9 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
   const placedCubes = new Map<string, ColorCube>();
   let pendingPlacement: { position: Vector3; color: Color3 } | null = null;
   const gridKey = (position: Vector3) => `${position.x},${position.z}`;
-
   const remotePlayers = new Map<string, Player>();
+  let currentMode: PlayerMode = ui.getMode();
+  let matchPaused = colyseusConnection.isMatchPaused();
 
   const spawnRemotePlayer = (id: string) => {
     if (remotePlayers.has(id)) {
@@ -110,6 +111,15 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
     remotePlayers.delete(id);
   });
 
+  colyseusConnection.onMatchStatusChange((status) => {
+    const paused = status === MatchStatusCode.Pause;
+    matchPaused = paused;
+    if (paused) {
+      player.stopMovement();
+      pendingPlacement = null;
+    }
+  });
+
   const positionMatches = (posA: Vector3, posB: Vector3, tolerance = 0.05) =>
     Math.abs(posA.x - posB.x) < tolerance && Math.abs(posA.z - posB.z) < tolerance;
 
@@ -129,12 +139,14 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
     placedCubes.set(key, cube);
     pendingPlacement = null;
   });
-  let currentMode: PlayerMode = ui.getMode();
   ui.onModeChange = (mode) => {
     currentMode = mode;
   };
 
   scene.onPointerObservable.add((pointerInfo) => {
+    if (matchPaused) {
+      return;
+    }
     if (pointerInfo.type === PointerEventTypes.POINTERDOWN) {
       const pick = scene.pick(scene.pointerX, scene.pointerY, (mesh) => mesh === ground);
       if (pick && pick.hit && pick.pickedPoint) {

@@ -4,11 +4,14 @@ import {
   TextBlock
 } from "babylonjs-gui";
 
+const DEFAULT_PREFIX = "Next match";
+
 export class MatchTimer {
   private readonly label: TextBlock;
+  private prefix = DEFAULT_PREFIX;
 
   constructor(gui: AdvancedDynamicTexture) {
-    this.label = new TextBlock("matchTimer", "Time left: --:--");
+    this.label = new TextBlock("matchTimer", `${DEFAULT_PREFIX}: --:--`);
     this.label.fontSize = 20;
     this.label.fontFamily = "Consolas";
     this.label.color = "white";
@@ -30,7 +33,11 @@ export class MatchTimer {
     const remainingSeconds = Math.floor(seconds % 60);
     const paddedMinutes = minutes.toString().padStart(2, "0");
     const paddedSeconds = remainingSeconds.toString().padStart(2, "0");
-    this.label.text = `Time left: ${paddedMinutes}:${paddedSeconds}`;
+    this.label.text = `${this.prefix}: ${paddedMinutes}:${paddedSeconds}`;
+  }
+
+  setLabelPrefix(prefix: string) {
+    this.prefix = prefix;
   }
 
   setVisible(value: boolean) {
