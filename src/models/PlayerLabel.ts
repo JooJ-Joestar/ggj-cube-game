@@ -39,6 +39,10 @@ export class PlayerLabel {
     this.refreshVisibility();
   }
 
+  dispose() {
+    this.label.dispose();
+  }
+
   private refreshVisibility() {
     this.label.isVisible = Boolean(this.playerName && this.mesh);
   }

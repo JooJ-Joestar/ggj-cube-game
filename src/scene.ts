@@ -81,17 +81,21 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
 
   const spawnRemotePlayer = (id: string) => {
     if (remotePlayers.has(id)) {
-      return;
+      return remotePlayers.get(id) ?? null;
     }
     const remote = new Player(playerFactory, id, false);
     remotePlayers.set(id, remote);
+    return remote;
   };
 
-  colyseusConnection.onRemotePlayerJoined(({ id }) => {
+  colyseusConnection.onRemotePlayerJoined(({ id, name }) => {
     if (id === colyseusConnection.getPlayerId()) {
       return;
     }
-    spawnRemotePlayer(id);
+    const remote = spawnRemotePlayer(id);
+    if (remote) {
+      ui.attachRemotePlayerLabel(id, name, remote.mesh);
+    }
   });
 
   colyseusConnection.onRemotePlayerMoved(({ id, position }) => {
@@ -109,6 +113,7 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
     }
     remote.mesh.dispose();
     remotePlayers.delete(id);
+    ui.removeRemotePlayerLabel(id);
   });
 
   colyseusConnection.onMatchStatusChange((status) => {

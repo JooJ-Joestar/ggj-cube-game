@@ -36,6 +36,15 @@ export class MyRoom extends Room<MyRoomState> {
       this.replyWithName(client);
     });
 
+    this.onMessage("whoIs", (client, message: { id?: string }) => {
+      const id = message?.id;
+      if (!id) {
+        return;
+      }
+      const name = this.playerNames.get(id) ?? "Player n/a";
+      client.send("whoIsResult", { id, name });
+    });
+
     this.onMessage("playerMove", (client, message) => {
       this.broadcast("playerMoved", {
         id: client.sessionId,

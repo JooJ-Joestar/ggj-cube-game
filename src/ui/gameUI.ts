@@ -1,4 +1,4 @@
-import { Scene } from "babylonjs";
+import { Scene, Mesh } from "babylonjs";
 import { AdvancedDynamicTexture } from "babylonjs-gui";
 import { PlayerLabel } from "../models/PlayerLabel";
 import { ColyseusConnection } from "../connection";
@@ -17,6 +17,7 @@ export class GameUI {
   private timer: MatchTimer;
   private scoreboard: ScoreboardPanel;
   private attacks: PlayerAttacks;
+  private remoteLabels = new Map<string, PlayerLabel>();
   public onModeChange: (mode: PlayerMode) => void = () => {};
 
   constructor(scene: Scene, connection: ColyseusConnection) {
@@ -73,6 +74,25 @@ export class GameUI {
 
   attachPlayerMesh(mesh: any) {
     this.label.attachToMesh(mesh);
+  }
+
+  attachRemotePlayerLabel(id: string, name: string, mesh: Mesh) {
+    let label = this.remoteLabels.get(id);
+    if (!label) {
+      label = new PlayerLabel(this.gui);
+      this.remoteLabels.set(id, label);
+    }
+    label.attachToMesh(mesh);
+    label.setName(name);
+  }
+
+  removeRemotePlayerLabel(id: string) {
+    const label = this.remoteLabels.get(id);
+    if (!label) {
+      return;
+    }
+    this.remoteLabels.delete(id);
+    label.dispose();
   }
 }
 
