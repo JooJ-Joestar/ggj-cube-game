@@ -30,7 +30,7 @@ export class PlayerAttacks {
     button.fontSize = 16;
     button.cornerRadius = 20;
     button.thickness = 0;
-    button.background = "rgba(173, 216, 230, 0.4)";
+    button.background = "rgba(173, 216, 230, 1)";
     button.color = "white";
     button.hoverCursor = "pointer";
     button.isPointerBlocker = true;
