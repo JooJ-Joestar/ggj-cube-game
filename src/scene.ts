@@ -78,6 +78,15 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
   const remotePlayers = new Map<string, Player>();
   let currentMode: PlayerMode = ui.getMode();
   let matchPaused = colyseusConnection.isMatchPaused();
+  let lastQuickAttackAt = 0;
+  let nextQuickAttackReadyAt = 0;
+  let quickAttackEnabled = true;
+  const projectiles: Array<{
+    mesh: any;
+    direction: Vector3;
+    remaining: number;
+    speed: number;
+  }> = [];
 
   const spawnRemotePlayer = (id: string) => {
     if (remotePlayers.has(id)) {
@@ -147,6 +156,36 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
   ui.onModeChange = (mode) => {
     currentMode = mode;
   };
+  ui.onQuickAttack = () => {
+    if (matchPaused) {
+      return;
+    }
+    const now = performance.now();
+    const cooldown = player.getQuickAttackCooldownMs();
+    if (now - lastQuickAttackAt < cooldown) {
+      return;
+    }
+    lastQuickAttackAt = now;
+    nextQuickAttackReadyAt = now + cooldown;
+    quickAttackEnabled = cooldown <= 0;
+    ui.setQuickAttackEnabled(quickAttackEnabled);
+    const direction = player.getFacingDirection();
+    direction.y = 0;
+    if (direction.lengthSquared() < 0.0001) {
+      direction.copyFromFloats(0, 0, 1);
+    }
+    direction.normalize();
+    const size = 0.5;
+    const attack = MeshBuilder.CreateBox("quickAttack", { size }, scene);
+    attack.position = player.mesh.position.clone();
+    attack.position.y = size / 2;
+    projectiles.push({
+      mesh: attack,
+      direction,
+      remaining: player.getQuickAttackDistance(),
+      speed: player.getQuickAttackSpeed()
+    });
+  };
 
   scene.onPointerObservable.add((pointerInfo) => {
     if ((pointerInfo as any).skipOnPointerObservable) {
@@ -176,8 +215,25 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
 
   engine.runRenderLoop(() => {
     const deltaSeconds = engine.getDeltaTime() / 1000;
+    const now = performance.now();
     camera.setTarget(player.mesh.position);
     player.update(deltaSeconds);
+    if (!quickAttackEnabled && now >= nextQuickAttackReadyAt) {
+      quickAttackEnabled = true;
+      ui.setQuickAttackEnabled(true);
+    }
+    if (projectiles.length) {
+      for (let i = projectiles.length - 1; i >= 0; i--) {
+        const projectile = projectiles[i];
+        const step = Math.min(projectile.speed * deltaSeconds, projectile.remaining);
+        projectile.mesh.position.addInPlace(projectile.direction.scale(step));
+        projectile.remaining -= step;
+        if (projectile.remaining <= 0) {
+          projectile.mesh.dispose();
+          projectiles.splice(i, 1);
+        }
+      }
+    }
     colyseusConnection.sendPlayerMovement({
       x: player.mesh.position.x,
       y: player.mesh.position.y,

@@ -19,6 +19,7 @@ export class GameUI {
   private attacks: PlayerAttacks;
   private remoteLabels = new Map<string, PlayerLabel>();
   public onModeChange: (mode: PlayerMode) => void = () => {};
+  public onQuickAttack: () => void = () => {};
 
   constructor(scene: Scene, connection: ColyseusConnection) {
     this.gui = AdvancedDynamicTexture.CreateFullscreenUI("game-ui", true, scene as any);
@@ -58,6 +59,7 @@ export class GameUI {
     this.updateDebugInfo(connection);
 
     this.attacks = new PlayerAttacks(this.gui);
+    this.attacks.onQuickAttack = () => this.onQuickAttack();
   }
 
   getMode() {
@@ -74,6 +76,10 @@ export class GameUI {
 
   attachPlayerMesh(mesh: any) {
     this.label.attachToMesh(mesh);
+  }
+
+  setQuickAttackEnabled(enabled: boolean) {
+    this.attacks.setQuickAttackEnabled(enabled);
   }
 
   attachRemotePlayerLabel(id: string, name: string, mesh: Mesh) {

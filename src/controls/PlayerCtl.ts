@@ -19,6 +19,7 @@ export class PlayerCtl extends Player {
   private pathPoints: Vector3[] = [];
   private currentSegmentIndex = 0;
   private destinationCallback: ((position: Vector3) => void) | null = null;
+  private lastMoveDirection = new Vector3(0, 0, 1);
 
   constructor(factory: PlayerFactory, obstacles: Obstacle[], id = "") {
     super(factory, id, true);
@@ -69,6 +70,7 @@ export class PlayerCtl extends Player {
     }
 
     direction.normalize();
+    this.lastMoveDirection = direction.clone();
     const moveDistance = Math.min(this.maxSpeed * deltaSeconds, distance);
     const nextPosition = this.mesh.position.add(direction.scale(moveDistance));
 
@@ -85,6 +87,13 @@ export class PlayerCtl extends Player {
     this.pathPoints = [];
     this.currentSegmentIndex = 0;
     this.clearPathLine();
+  }
+
+  getFacingDirection() {
+    if (this.lastMoveDirection.lengthSquared() < 0.0001) {
+      return new Vector3(0, 0, 1);
+    }
+    return this.lastMoveDirection.clone();
   }
 
   private collidesWithObstacle(nextPosition: Vector3) {

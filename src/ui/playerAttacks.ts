@@ -4,6 +4,11 @@ export class PlayerAttacks {
   private readonly container: StackPanel;
   private readonly quickAttackButton: Button;
   private readonly specialButton: Button;
+  private readonly quickAttackEnabledColor = "rgba(173, 216, 230, 1)";
+  private readonly quickAttackDisabledColor = "rgba(140, 140, 140, 0.8)";
+  private quickAttackReady = true;
+  public onQuickAttack: () => void = () => {};
+  public onSpecial: () => void = () => {};
 
   constructor(gui: AdvancedDynamicTexture) {
     this.container = new StackPanel();
@@ -17,14 +22,25 @@ export class PlayerAttacks {
     this.container.isPointerBlocker = false;
     gui.addControl(this.container);
 
-    this.quickAttackButton = this.createButton("Quick attack");
-    this.specialButton = this.createButton("Special");
+    this.quickAttackButton = this.createButton(
+      "Quick attack",
+      () => this.onQuickAttack(),
+      () => this.quickAttackReady
+    );
+    this.specialButton = this.createButton("Special", () => this.onSpecial());
 
     this.container.addControl(this.quickAttackButton);
     this.container.addControl(this.specialButton);
   }
 
-  private createButton(text: string) {
+  setQuickAttackEnabled(enabled: boolean) {
+    this.quickAttackReady = enabled;
+    this.quickAttackButton.background = enabled
+      ? this.quickAttackEnabledColor
+      : this.quickAttackDisabledColor;
+  }
+
+  private createButton(text: string, handler: () => void, canActivate?: () => boolean) {
     const button = Button.CreateSimpleButton(`${text.replace(/\s+/g, "")}Btn`, text);
     button.height = "40px";
     button.fontSize = 16;
@@ -34,6 +50,12 @@ export class PlayerAttacks {
     button.color = "white";
     button.hoverCursor = "pointer";
     button.isPointerBlocker = true;
+    button.onPointerUpObservable.add(() => {
+      if (canActivate && !canActivate()) {
+        return;
+      }
+      handler();
+    });
     return button;
   }
 }
