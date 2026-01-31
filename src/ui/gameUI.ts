@@ -6,6 +6,7 @@ import { PlayerControls, PlayerMode } from "./playerControls";
 import { DebugPanel } from "./debugPanel";
 import { MatchTimer } from "./timer";
 import { MatchStatusCode } from "../connection";
+import { ScoreboardPanel } from "./scoreboard";
 
 export class GameUI {
   private gui: AdvancedDynamicTexture;
@@ -13,6 +14,7 @@ export class GameUI {
   private debugPanel: DebugPanel;
   private label: PlayerLabel;
   private timer: MatchTimer;
+  private scoreboard: ScoreboardPanel;
   public onModeChange: (mode: PlayerMode) => void = () => {};
 
   constructor(scene: Scene, connection: ColyseusConnection) {
@@ -34,6 +36,14 @@ export class GameUI {
     connection.onMatchStatusChange((status) => {
       const prefix = status === MatchStatusCode.Play ? "Time left" : "Next match";
       this.timer.setLabelPrefix(prefix);
+    });
+    this.scoreboard = new ScoreboardPanel(this.gui);
+    this.scoreboard.setVisible(false);
+    this.controls.onScoreboardToggle = (visible) => this.scoreboard.setVisible(visible);
+    connection.onScoreboardUpdate((entries) => {
+      this.scoreboard.update(
+        entries.map((entry) => ({ name: entry.name, score: entry.score }))
+      );
     });
 
     this.debugPanel = new DebugPanel(this.gui);

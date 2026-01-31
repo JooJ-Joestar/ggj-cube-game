@@ -144,6 +144,9 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
   };
 
   scene.onPointerObservable.add((pointerInfo) => {
+    if ((pointerInfo as any).skipOnPointerObservable) {
+      return;
+    }
     if (matchPaused) {
       return;
     }

@@ -9,6 +9,8 @@ const DEFAULT_URL = "ws://localhost:2567";
 type RemotePlayerInfo = { id: string; name: string };
 type RemotePlayerMovement = { id: string; position: { x: number; y: number; z: number } };
 type MatchTimePayload = { time: number };
+type ScoreboardEntry = { id: string; name: string; score: number };
+type ScoreboardPayload = { entries: ScoreboardEntry[] };
 type MatchStatusPayload = { status: number };
 
 export enum MatchStatusCode {
@@ -29,7 +31,9 @@ export class ColyseusConnection {
   private remotePlayerLeaveListeners: Array<(id: string) => void> = [];
   private matchTimeListeners: Array<(seconds: number) => void> = [];
   private matchStatusListeners: Array<(status: number) => void> = [];
+  private scoreboardListeners: Array<(entries: ScoreboardEntry[]) => void> = [];
   private matchStatus = MatchStatusCode.Play;
+  private latestScoreboard: ScoreboardEntry[] = [];
 
   constructor() {
     this.serverUrl = process.env.COLYSEUS_URL || DEFAULT_URL;
@@ -107,6 +111,12 @@ export class ColyseusConnection {
       if (typeof message.status === "number") {
         this.matchStatus = message.status;
         this.matchStatusListeners.forEach((listener) => listener(message.status));
+      }
+    });
+    room.onMessage("updateScoreboard", (message: ScoreboardPayload) => {
+      if (Array.isArray(message.entries)) {
+        this.latestScoreboard = message.entries;
+        this.scoreboardListeners.forEach((listener) => listener(message.entries));
       }
     });
 
@@ -215,6 +225,13 @@ export class ColyseusConnection {
   onMatchStatusChange(callback: (status: number) => void) {
     this.matchStatusListeners.push(callback);
     callback(this.matchStatus);
+  }
+
+  onScoreboardUpdate(callback: (entries: ScoreboardEntry[]) => void) {
+    this.scoreboardListeners.push(callback);
+    if (this.latestScoreboard.length) {
+      callback(this.latestScoreboard);
+    }
   }
 
   isMatchPaused() {

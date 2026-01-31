@@ -23,6 +23,7 @@ export class MatchTimer {
     this.label.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
     this.label.paddingTop = "8px";
     this.label.isPointerBlocker = false;
+    this.label.isHitTestVisible = false;
     this.label.shadowColor = "black";
     this.label.shadowBlur = 4;
     gui.addControl(this.label);

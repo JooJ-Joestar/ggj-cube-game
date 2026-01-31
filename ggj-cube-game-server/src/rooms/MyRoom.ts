@@ -13,15 +13,18 @@ export class MyRoom extends Room<MyRoomState> {
   maxClients = 4;
   state = new MyRoomState();
   private playerNames = new Map<string, string>();
+  private playerScores = new Map<string, number>();
   private matchPlayDuration = 60;
   private matchPauseDuration = 15;
   private matchLoopAbort = false;
   private matchLoopRunning = false;
+  private scoreboardInterval: ReturnType<typeof setInterval> | null = null;
 
   onCreate(options: any) {
     this.matchPlayDuration = this.getEnvDuration("MATCH_PLAY_TIME", 60);
     this.matchPauseDuration = this.getEnvDuration("MATCH_PAUSE_TIME", 15);
     this.runMatchLoop();
+    this.startScoreboardBroadcast();
 
     this.onMessage("type", (client, message) => {
       //
@@ -48,6 +51,7 @@ export class MyRoom extends Room<MyRoomState> {
       style: "capital"
     });
     this.playerNames.set(client.sessionId, playerName);
+    this.playerScores.set(client.sessionId, 0);
     for (const [otherId, otherName] of this.playerNames.entries()) {
       if (otherId !== client.sessionId) {
         client.send("playerJoined", { id: otherId, name: otherName });
@@ -62,12 +66,17 @@ export class MyRoom extends Room<MyRoomState> {
 
   onLeave(client: Client, consented: boolean) {
     this.playerNames.delete(client.sessionId);
+    this.playerScores.delete(client.sessionId);
     this.broadcast("playerLeft", { id: client.sessionId });
     console.log(client.sessionId, "left!");
   }
 
   onDispose() {
     this.matchLoopAbort = true;
+    if (this.scoreboardInterval) {
+      clearInterval(this.scoreboardInterval);
+      this.scoreboardInterval = null;
+    }
     console.log("room", this.roomId, "disposing...");
   }
 
@@ -103,6 +112,34 @@ export class MyRoom extends Room<MyRoomState> {
         break;
       }
       await this.delay(1000);
+    }
+  }
+
+  private startScoreboardBroadcast() {
+    this.broadcastScoreboard();
+    this.scoreboardInterval = setInterval(() => {
+      if (this.matchLoopAbort) {
+        return;
+      }
+      this.incrementScores();
+      this.broadcastScoreboard();
+    }, 500);
+  }
+
+  private broadcastScoreboard() {
+    const entries = Array.from(this.playerNames.entries()).map(([id, name]) => ({
+      id,
+      name,
+      score: this.playerScores.get(id) ?? 0
+    }));
+    entries.sort((a, b) => b.score - a.score);
+    this.broadcast("updateScoreboard", { entries });
+  }
+
+  private incrementScores() {
+    for (const id of this.playerScores.keys()) {
+      const existing = this.playerScores.get(id) ?? 0;
+      this.playerScores.set(id, existing + 1);
     }
   }
 

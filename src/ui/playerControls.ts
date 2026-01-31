@@ -14,9 +14,12 @@ export class PlayerControls {
   private moveButton: Button;
   private placeButton: Button;
   private colorButton: Button;
+  private scoreboardButton: Button;
   private selectedColor = new Color3(1, 0.4, 0);
   public onModeChange: (mode: PlayerMode) => void = () => {};
+  public onScoreboardToggle: (visible: boolean) => void = () => {};
   private readonly gui: AdvancedDynamicTexture;
+  private scoreboardVisible = false;
 
   constructor(gui: AdvancedDynamicTexture) {
     this.gui = gui;
@@ -28,12 +31,17 @@ export class PlayerControls {
     controlsStack.paddingTop = "16px";
     controlsStack.paddingRight = "16px";
     controlsStack.spacing = 8;
+    controlsStack.isPointerBlocker = false;
+    controlsStack.isHitTestVisible = false;
     gui.addControl(controlsStack);
 
     this.moveButton = this.createButton("Move", () => this.setMode("move"));
     this.placeButton = this.createButton("Place", () => this.setMode("place"));
     this.colorButton = this.createButton("Color", () => this.openColorWheel());
     this.colorButton.isVisible = false;
+    this.scoreboardButton = this.createScoreboardButton("Show scoreboard", () =>
+      this.toggleScoreboard()
+    );
 
     controlsStack.addControl(this.moveButton);
     controlsStack.addControl(this.placeButton);
@@ -41,6 +49,20 @@ export class PlayerControls {
 
     this.updateButtonStates();
     this.updateColorButton();
+    const scoreboardStack = new StackPanel();
+    scoreboardStack.isVertical = true;
+    scoreboardStack.width = "180px";
+    scoreboardStack.height = "40px";
+    scoreboardStack.adaptHeightToChildren = true;
+    scoreboardStack.adaptWidthToChildren = true;
+    scoreboardStack.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+    scoreboardStack.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
+    scoreboardStack.paddingLeft = "16px";
+    scoreboardStack.paddingBottom = "16px";
+    scoreboardStack.isPointerBlocker = false;
+    scoreboardStack.isHitTestVisible = false;
+    gui.addControl(scoreboardStack);
+    scoreboardStack.addControl(this.scoreboardButton);
   }
 
   getMode() {
@@ -93,8 +115,33 @@ export class PlayerControls {
     button.background = "rgba(173, 216, 230, 0.4)";
     button.color = "white";
     button.hoverCursor = "pointer";
+    button.isPointerBlocker = true;
     button.onPointerUpObservable.add(() => handler());
     return button;
+  }
+
+  private createScoreboardButton(text: string, handler: () => void) {
+    const button = Button.CreateSimpleButton("scoreboardBtn", text);
+    button.height = "34px";
+    button.fontSize = 14;
+    button.cornerRadius = 18;
+    button.thickness = 0;
+    button.background = "rgba(173, 216, 230, 0.5)";
+    button.color = "white";
+    button.hoverCursor = "pointer";
+    button.width = "180px";
+    button.isPointerBlocker = true;
+    button.onPointerUpObservable.add(() => handler());
+    return button;
+  }
+
+  private toggleScoreboard() {
+    this.scoreboardVisible = !this.scoreboardVisible;
+    const label = this.scoreboardVisible ? "Hide scoreboard" : "Show scoreboard";
+    if (this.scoreboardButton.textBlock) {
+      this.scoreboardButton.textBlock.text = label;
+    }
+    this.onScoreboardToggle(this.scoreboardVisible);
   }
 
   private isColorDark(color: Color3) {
