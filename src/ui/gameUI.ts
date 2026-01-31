@@ -33,13 +33,18 @@ export class GameUI {
 
     this.timer = new MatchTimer(this.gui);
     connection.onMatchTimeChange((seconds) => this.timer.update(seconds));
-    connection.onMatchStatusChange((status) => {
-      const prefix = status === MatchStatusCode.Play ? "Time left" : "Next match";
-      this.timer.setLabelPrefix(prefix);
-    });
     this.scoreboard = new ScoreboardPanel(this.gui);
     this.scoreboard.setVisible(false);
     this.controls.onScoreboardToggle = (visible) => this.scoreboard.setVisible(visible);
+    connection.onMatchStatusChange((status) => {
+      const prefix = status === MatchStatusCode.Play ? "Time left" : "Next match";
+      this.timer.setLabelPrefix(prefix);
+      if (status === MatchStatusCode.Pause) {
+        this.scoreboard.setVisible(true);
+      } else {
+        this.scoreboard.setVisible(false);
+      }
+    });
     connection.onScoreboardUpdate((entries) => {
       this.scoreboard.update(
         entries.map((entry) => ({ name: entry.name, score: entry.score }))

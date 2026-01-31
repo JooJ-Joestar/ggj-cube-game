@@ -121,7 +121,6 @@ export class MyRoom extends Room<MyRoomState> {
       if (this.matchLoopAbort) {
         return;
       }
-      this.incrementScores();
       this.broadcastScoreboard();
     }, 500);
   }
@@ -136,12 +135,7 @@ export class MyRoom extends Room<MyRoomState> {
     this.broadcast("updateScoreboard", { entries });
   }
 
-  private incrementScores() {
-    for (const id of this.playerScores.keys()) {
-      const existing = this.playerScores.get(id) ?? 0;
-      this.playerScores.set(id, existing + 1);
-    }
-  }
+  // Scores are only updated by gameplay events; no time-based changes.
 
   private delay(ms: number) {
     return new Promise<void>((resolve) => setTimeout(resolve, ms));

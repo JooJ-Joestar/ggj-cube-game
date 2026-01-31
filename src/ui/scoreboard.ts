@@ -21,13 +21,19 @@ export class ScoreboardPanel {
     this.container.cornerRadius = 12;
     this.container.background = "rgba(0, 0, 0, 0.75)";
     this.container.thickness = 0;
-    this.container.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
-    this.container.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    this.container.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
+    this.container.verticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
     this.container.paddingLeft = "10px";
     this.container.paddingRight = "10px";
     this.container.paddingTop = "8px";
     this.container.paddingBottom = "8px";
     this.container.isPointerBlocker = false;
+
+    const content = new StackPanel();
+    content.isVertical = true;
+    content.width = "100%";
+    content.isPointerBlocker = false;
+    this.container.addControl(content);
 
     this.title = new TextBlock("scoreboardTitle", "Scoreboard");
     this.title.fontSize = 18;
@@ -35,21 +41,21 @@ export class ScoreboardPanel {
     this.title.color = "white";
     this.title.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
     this.title.height = "30px";
-    this.container.addControl(this.title);
+    this.title.paddingBottom = "6px";
+    content.addControl(this.title);
 
     const scroll = new ScrollViewer();
     scroll.width = "100%";
     scroll.height = "260px";
     scroll.barColor = "rgba(255, 255, 255, 0.4)";
-    scroll.thickness = 8;
+    scroll.thickness = 0;
     scroll.background = "transparent";
     scroll.isPointerBlocker = false;
-    scroll.thickness = 0;
     this.entriesPanel = new StackPanel();
     this.entriesPanel.isVertical = true;
     this.entriesPanel.width = "100%";
     scroll.addControl(this.entriesPanel);
-    this.container.addControl(scroll);
+    content.addControl(scroll);
 
     gui.addControl(this.container);
     this.setVisible(false);
