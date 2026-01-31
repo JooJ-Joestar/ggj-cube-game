@@ -6,6 +6,9 @@ type RoomWithClients<State = unknown> = Room<State> & {
 
 const DEFAULT_URL = "ws://localhost:2567";
 
+type RemotePlayerInfo = { id: string; name: string };
+type RemotePlayerMovement = { id: string; position: { x: number; y: number; z: number } };
+
 export class ColyseusConnection {
   private client: Client | null = null;
   private room: RoomWithClients | null = null;
@@ -14,6 +17,9 @@ export class ColyseusConnection {
   private disconnectedAt: number | null = null;
   private playerName = "";
   private playerNameListeners: Array<(name: string) => void> = [];
+  private remotePlayerJoinListeners: Array<(info: RemotePlayerInfo) => void> = [];
+  private remotePlayerMoveListeners: Array<(movement: RemotePlayerMovement) => void> = [];
+  private remotePlayerLeaveListeners: Array<(id: string) => void> = [];
 
   constructor() {
     this.serverUrl = process.env.COLYSEUS_URL || DEFAULT_URL;
@@ -80,6 +86,25 @@ export class ColyseusConnection {
       if (message?.name) {
         this.setPlayerName(message.name);
       }
+    });
+
+    room.onMessage("playerJoined", (message: RemotePlayerInfo) => {
+      if (message.id === room.sessionId) {
+        return;
+      }
+      this.remotePlayerJoinListeners.forEach((listener) => listener(message));
+    });
+    room.onMessage("playerMoved", (message: RemotePlayerMovement) => {
+      if (message.id === room.sessionId) {
+        return;
+      }
+      this.remotePlayerMoveListeners.forEach((listener) => listener(message));
+    });
+    room.onMessage("playerLeft", ({ id }) => {
+      if (id === room.sessionId) {
+        return;
+      }
+      this.remotePlayerLeaveListeners.forEach((listener) => listener(id));
     });
   }
 
@@ -149,6 +174,24 @@ export class ColyseusConnection {
     }
   }
 
+  onRemotePlayerJoined(callback: (info: RemotePlayerInfo) => void) {
+    this.remotePlayerJoinListeners.push(callback);
+  }
+
+  onRemotePlayerMoved(callback: (movement: RemotePlayerMovement) => void) {
+    this.remotePlayerMoveListeners.push(callback);
+  }
+
+  onRemotePlayerLeft(callback: (id: string) => void) {
+    this.remotePlayerLeaveListeners.push(callback);
+  }
+
+  sendPlayerMovement(position: { x: number; y: number; z: number }) {
+    if (!this.room) {
+      return;
+    }
+    this.room.send("playerMove", { position });
+  }
 }
 
 export const colyseusConnection = new ColyseusConnection();

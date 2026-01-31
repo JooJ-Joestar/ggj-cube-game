@@ -21,6 +21,13 @@ export class MyRoom extends Room<MyRoomState> {
     this.onMessage("whoAmI", (client) => {
       this.replyWithName(client);
     });
+
+    this.onMessage("playerMove", (client, message) => {
+      this.broadcast("playerMoved", {
+        id: client.sessionId,
+        position: message.position
+      });
+    });
   }
 
   onJoin (client: Client, options: any) {
@@ -30,11 +37,21 @@ export class MyRoom extends Room<MyRoomState> {
       style: "capital"
     });
     this.playerNames.set(client.sessionId, playerName);
+    for (const [otherId, otherName] of this.playerNames.entries()) {
+      if (otherId !== client.sessionId) {
+        client.send("playerJoined", { id: otherId, name: otherName });
+      }
+    }
+    this.broadcast("playerJoined", {
+      id: client.sessionId,
+      name: playerName
+    });
     console.log(client.sessionId, "joined as", playerName);
   }
 
   onLeave (client: Client, consented: boolean) {
     this.playerNames.delete(client.sessionId);
+    this.broadcast("playerLeft", { id: client.sessionId });
     console.log(client.sessionId, "left!");
   }
 

@@ -11,10 +11,12 @@ import {
   LinesMesh
 } from "babylonjs";
 import { Obstacle } from "./models/Obstacle";
+import { Player } from "./models/Player";
 import { PlayerCtl } from "./controls/PlayerCtl";
 import { ColorCube } from "./models/ColorCube";
 import { GameUI, PlayerMode } from "./ui/gameUI";
 import { colyseusConnection } from "./connection";
+import { PlayerFactory } from "./factory/PlayerFactory";
 
 export function createScene(canvas: HTMLCanvasElement): Scene {
   const engine = new Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true });
@@ -64,7 +66,8 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
   obstacles.push(new Obstacle(scene, new Vector3(3, 0, 3)));
   obstacles.push(new Obstacle(scene, new Vector3(-4, 0, -1)));
 
-  const player = new PlayerCtl(scene, obstacles);
+  const playerFactory = new PlayerFactory(scene);
+  const player = new PlayerCtl(playerFactory, obstacles);
   camera.setTarget(player.mesh.position);
   const cameraOffset = camera.position.subtract(player.mesh.position);
   const ui = new GameUI(scene, colyseusConnection);
@@ -72,6 +75,40 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
   const placedCubes = new Map<string, ColorCube>();
   let pendingPlacement: { position: Vector3; color: Color3 } | null = null;
   const gridKey = (position: Vector3) => `${position.x},${position.z}`;
+
+  const remotePlayers = new Map<string, Player>();
+
+  const spawnRemotePlayer = (id: string) => {
+    if (remotePlayers.has(id)) {
+      return;
+    }
+    const remote = new Player(playerFactory, id, false);
+    remotePlayers.set(id, remote);
+  };
+
+  colyseusConnection.onRemotePlayerJoined(({ id }) => {
+    if (id === colyseusConnection.getPlayerId()) {
+      return;
+    }
+    spawnRemotePlayer(id);
+  });
+
+  colyseusConnection.onRemotePlayerMoved(({ id, position }) => {
+    const remote = remotePlayers.get(id);
+    if (!remote) {
+      return;
+    }
+    remote.setPosition(new Vector3(position.x, position.y, position.z));
+  });
+
+  colyseusConnection.onRemotePlayerLeft((id) => {
+    const remote = remotePlayers.get(id);
+    if (!remote) {
+      return;
+    }
+    remote.mesh.dispose();
+    remotePlayers.delete(id);
+  });
 
   const positionMatches = (posA: Vector3, posB: Vector3, tolerance = 0.05) =>
     Math.abs(posA.x - posB.x) < tolerance && Math.abs(posA.z - posB.z) < tolerance;
@@ -121,6 +158,11 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
     const deltaSeconds = engine.getDeltaTime() / 1000;
     camera.setTarget(player.mesh.position);
     player.update(deltaSeconds);
+    colyseusConnection.sendPlayerMovement({
+      x: player.mesh.position.x,
+      y: player.mesh.position.y,
+      z: player.mesh.position.z
+    });
     ui.updateDebugInfo(colyseusConnection);
     camera.position = player.mesh.position.add(cameraOffset);
     scene.render();
@@ -128,6 +170,8 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
 
   window.addEventListener("resize", () => engine.resize());
 
-  colyseusConnection.connect();
+  colyseusConnection.connect().then(() => {
+    player.setId(colyseusConnection.getPlayerId());
+  });
   return scene;
 }

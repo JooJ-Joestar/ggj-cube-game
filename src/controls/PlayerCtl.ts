@@ -1,6 +1,5 @@
 import {
   MeshBuilder,
-  StandardMaterial,
   Color3,
   Scene,
   Vector3,
@@ -9,9 +8,10 @@ import {
 } from "babylonjs";
 import { Obstacle } from "../models/Obstacle";
 import { colyseusConnection } from "../connection";
+import { PlayerFactory } from "../factory/PlayerFactory";
+import { Player } from "../models/Player";
 
-export class PlayerCtl {
-  readonly mesh: Mesh;
+export class PlayerCtl extends Player {
   private target: Vector3 | null = null;
   private readonly obstacles: Obstacle[];
   private readonly maxSpeed = 3; // units per second
@@ -20,14 +20,9 @@ export class PlayerCtl {
   private currentSegmentIndex = 0;
   private destinationCallback: ((position: Vector3) => void) | null = null;
 
-  constructor(scene: Scene, obstacles: Obstacle[]) {
+  constructor(factory: PlayerFactory, obstacles: Obstacle[], id = "") {
+    super(factory, id, true);
     this.obstacles = obstacles;
-    this.mesh = MeshBuilder.CreateBox("PlayerCube", { size: 1 }, scene);
-    this.mesh.renderingGroupId = 1;
-    this.mesh.position.y = 0.5;
-    const material = new StandardMaterial("playerMat", scene);
-    material.diffuseColor = new Color3(0.2, 0.6, 1);
-    this.mesh.material = material;
   }
 
   setTarget(point: Vector3) {
