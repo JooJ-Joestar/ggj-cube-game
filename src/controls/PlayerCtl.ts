@@ -189,7 +189,6 @@ export class PlayerCtl extends Player {
     anchorZ: number,
     transform: TemplateTransform,
   ) {
-    console.log("spawnEntity");
     if (!this.drawingAccess) {
       return;
     }

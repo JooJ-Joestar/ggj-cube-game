@@ -65,6 +65,7 @@ export class ColyseusConnection {
   private placedCubesListeners: Array<(payload: PlacedCubesPayload) => void> = [];
   private matchStatus = MatchStatusCode.Play;
   private latestScoreboard: ScoreboardEntry[] = [];
+  private remotePlayerIds = new Set<string>();
 
   constructor() {
     this.serverUrl = process.env.COLYSEUS_URL || DEFAULT_URL;
@@ -85,6 +86,10 @@ export class ColyseusConnection {
       this.room = room;
       this.connected = true;
       this.disconnectedAt = null;
+      this.remotePlayerIds.clear();
+      if (room.sessionId) {
+        this.remotePlayerIds.delete(room.sessionId);
+      }
       this.hookRoomEvents(room);
       room.send("whoAmI");
       console.info("Joined room", room.roomId);
@@ -107,11 +112,13 @@ export class ColyseusConnection {
     anyClient.onError?.add?.((err: unknown) => {
       this.connected = false;
       this.disconnectedAt = Date.now();
+      this.remotePlayerIds.clear();
       console.warn("Colyseus client error", err);
     });
     anyClient.onClose?.add?.(() => {
       this.connected = false;
       this.disconnectedAt = Date.now();
+      this.remotePlayerIds.clear();
       console.info("Colyseus client closed");
       this.client = null;
     });
@@ -197,6 +204,7 @@ export class ColyseusConnection {
       if (message.id === room.sessionId) {
         return;
       }
+      this.remotePlayerIds.add(message.id);
       this.remotePlayerJoinListeners.forEach((listener) => listener(message));
     });
     room.onMessage("playerMoved", (message: RemotePlayerMovement) => {
@@ -209,6 +217,7 @@ export class ColyseusConnection {
       if (id === room.sessionId) {
         return;
       }
+      this.remotePlayerIds.delete(id);
       this.remotePlayerLeaveListeners.forEach((listener) => listener(id));
     });
   }
@@ -242,7 +251,10 @@ export class ColyseusConnection {
   }
 
   getPlayerCount() {
-    return this.room?.clients ?? 0;
+    if (!this.connected || !this.room) {
+      return 0;
+    }
+    return 1 + this.remotePlayerIds.size;
   }
 
   getLastLatency() {
