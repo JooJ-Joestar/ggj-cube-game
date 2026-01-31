@@ -52,6 +52,15 @@ export class PlayerCtl extends Player {
     "DRAWING_SCOUT_PROJECTILE_DISTANCE_MULTIPLIER",
     1.5
   );
+  private readonly scoutSpecialSpeedMultiplier = this.getEnvNumber(
+    "DRAWING_SCOUT_SPECIAL_SPEED_MULTIPLIER",
+    3
+  );
+  private readonly scoutSpecialDistanceMultiplier = this.getEnvNumber(
+    "DRAWING_SCOUT_SPECIAL_DISTANCE_MULTIPLIER",
+    3
+  );
+  private readonly defaultSpawnClass = this.getEnvString("DEFAULT_SPAWN_CLASS", "none");
   private scoutApplied = false;
   private baseColor: Color3;
   private scoutBaseQuickAttackSpeed: number | null = null;
@@ -74,6 +83,18 @@ export class PlayerCtl extends Player {
     }
     this.scoutBaseQuickAttackSpeed = this.getQuickAttackSpeed();
     this.scoutBaseQuickAttackDistance = this.getQuickAttackDistance();
+    this.applySpawnClass(this.defaultSpawnClass);
+  }
+
+  isScoutApplied() {
+    return this.scoutApplied;
+  }
+
+  getScoutSpecialMultipliers() {
+    return {
+      speed: this.scoutSpecialSpeedMultiplier,
+      distance: this.scoutSpecialDistanceMultiplier
+    };
   }
 
   setTarget(point: Vector3) {
@@ -289,6 +310,19 @@ export class PlayerCtl extends Player {
     );
   }
 
+  applySpawnClass(className: string) {
+    const normalized = className.trim().toLowerCase();
+    if (normalized === "scout") {
+      this.applyScoutBoost();
+      return;
+    }
+    if (normalized === "engineer" || normalized === "soldier" || normalized === "none") {
+      this.resetScoutBoost();
+      return;
+    }
+    this.resetScoutBoost();
+  }
+
   private getEnvNumber(key: string, fallback: number) {
     const raw = process.env[key];
     if (raw === undefined) {
@@ -296,6 +330,14 @@ export class PlayerCtl extends Player {
     }
     const parsed = Number(raw);
     return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
+  private getEnvString(key: string, fallback: string) {
+    const raw = process.env[key];
+    if (raw === undefined) {
+      return fallback;
+    }
+    return raw.trim() || fallback;
   }
 
   private collidesWithObstacle(nextPosition: Vector3) {

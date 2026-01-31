@@ -69,6 +69,7 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
 
   const playerFactory = new PlayerFactory(scene);
   const player = new PlayerCtl(playerFactory, obstacles);
+  player.applySpawnClass(process.env.DEFAULT_SPAWN_CLASS || "none");
   camera.setTarget(player.mesh.position);
   const cameraOffset = camera.position.subtract(player.mesh.position);
   const ui = new GameUI(scene, colyseusConnection);
@@ -81,9 +82,20 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
   let localPlayerId = "";
   let currentMode: PlayerMode = ui.getMode();
   let matchPaused = colyseusConnection.isMatchPaused();
+  const getEnvNumber = (key: string, fallback: number) => {
+    const raw = process.env[key];
+    if (raw === undefined) {
+      return fallback;
+    }
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  };
+
   let lastQuickAttackAt = 0;
   let nextQuickAttackReadyAt = 0;
   let quickAttackEnabled = true;
+  const scoutSpecialCooldownMs = getEnvNumber("SCOUT_SPECIAL_COOLDOWN_MS", 5000);
+  let lastSpecialAt = 0;
   const getRandomSpawnPosition = () => {
     const range = 2;
     const x = Math.round((Math.random() * 2 - 1) * range);
@@ -359,6 +371,32 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
       speed,
       distance
     });
+  };
+  ui.onSpecial = () => {
+    if (matchPaused) {
+      return;
+    }
+    if (!player.isScoutApplied()) {
+      return;
+    }
+    const now = performance.now();
+    if (scoutSpecialCooldownMs > 0 && now - lastSpecialAt < scoutSpecialCooldownMs) {
+      return;
+    }
+    lastSpecialAt = now;
+    const direction = player.getFacingDirection();
+    direction.y = 0;
+    if (direction.lengthSquared() < 0.0001) {
+      direction.copyFromFloats(0, 0, 1);
+    }
+    direction.normalize();
+    const multipliers = player.getScoutSpecialMultipliers();
+    const distance = player.getQuickAttackDistance() * multipliers.distance;
+    const speed = player.getQuickAttackSpeed() * multipliers.speed;
+    const origin = player.mesh.position.clone();
+    if (localPlayerId) {
+      spawnQuickAttack(origin, direction, distance, speed, localPlayerId);
+    }
   };
 
   scene.onPointerObservable.add((pointerInfo) => {

@@ -22,6 +22,7 @@ export class GameUI {
   private healthBars = new Map<string, PlayerHealthBar>();
   public onModeChange: (mode: PlayerMode) => void = () => {};
   public onQuickAttack: () => void = () => {};
+  public onSpecial: () => void = () => {};
 
   constructor(scene: Scene, connection: ColyseusConnection) {
     this.gui = AdvancedDynamicTexture.CreateFullscreenUI("game-ui", true, scene as any);
@@ -62,6 +63,7 @@ export class GameUI {
 
     this.attacks = new PlayerAttacks(this.gui);
     this.attacks.onQuickAttack = () => this.onQuickAttack();
+    this.attacks.onSpecial = () => this.onSpecial();
   }
 
   getMode() {
