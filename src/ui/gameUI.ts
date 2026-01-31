@@ -7,6 +7,7 @@ import { DebugPanel } from "./debugPanel";
 import { MatchTimer } from "./timer";
 import { MatchStatusCode } from "../connection";
 import { ScoreboardPanel } from "./scoreboard";
+import { PlayerAttacks } from "./playerAttacks";
 
 export class GameUI {
   private gui: AdvancedDynamicTexture;
@@ -15,6 +16,7 @@ export class GameUI {
   private label: PlayerLabel;
   private timer: MatchTimer;
   private scoreboard: ScoreboardPanel;
+  private attacks: PlayerAttacks;
   public onModeChange: (mode: PlayerMode) => void = () => {};
 
   constructor(scene: Scene, connection: ColyseusConnection) {
@@ -53,6 +55,8 @@ export class GameUI {
 
     this.debugPanel = new DebugPanel(this.gui);
     this.updateDebugInfo(connection);
+
+    this.attacks = new PlayerAttacks(this.gui);
   }
 
   getMode() {
