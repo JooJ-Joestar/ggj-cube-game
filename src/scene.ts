@@ -17,6 +17,7 @@ import { ColorCube } from "./models/ColorCube";
 import { GameUI, PlayerMode } from "./ui/gameUI";
 import { colyseusConnection, MatchStatusCode } from "./connection";
 import { PlayerFactory } from "./factory/PlayerFactory";
+import { PaletteColor, colorToPaletteId } from "./drawingTemplates/palette";
 
 export function createScene(canvas: HTMLCanvasElement): Scene {
   const engine = new Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true });
@@ -72,7 +73,7 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
   const cameraOffset = camera.position.subtract(player.mesh.position);
   const ui = new GameUI(scene, colyseusConnection);
   ui.attachPlayerMesh(player.mesh);
-  const placedCubes = new Map<string, ColorCube>();
+  const placedCubes = new Map<string, { cube: ColorCube; colorId: PaletteColor }>();
   let pendingPlacement: { position: Vector3; color: Color3 } | null = null;
   let pendingRemoval: { position: Vector3 } | null = null;
   const gridKey = (position: Vector3) => `${position.x},${position.z}`;
@@ -184,11 +185,12 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
     const key = gridKey(position);
     const existing = placedCubes.get(key);
     if (existing) {
-      existing.mesh.dispose();
+      existing.cube.mesh.dispose();
     }
     const color = new Color3(payload.color.r, payload.color.g, payload.color.b);
+    const colorId = colorToPaletteId(color);
     const cube = new ColorCube(scene, position, color);
-    placedCubes.set(key, cube);
+    placedCubes.set(key, { cube, colorId });
   });
 
   colyseusConnection.onCubeRemoved((payload) => {
@@ -199,7 +201,7 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
     const key = gridKey(position);
     const existing = placedCubes.get(key);
     if (existing) {
-      existing.mesh.dispose();
+      existing.cube.mesh.dispose();
       placedCubes.delete(key);
     }
   });
@@ -214,12 +216,13 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
       const key = gridKey(position);
       const existing = placedCubes.get(key);
       if (existing) {
-        existing.mesh.dispose();
+        existing.cube.mesh.dispose();
       }
-      const color = new Color3(cubeInfo.color.r, cubeInfo.color.g, cubeInfo.color.b);
-      const cube = new ColorCube(scene, position, color);
-      placedCubes.set(key, cube);
-    });
+    const color = new Color3(cubeInfo.color.r, cubeInfo.color.g, cubeInfo.color.b);
+    const colorId = colorToPaletteId(color);
+    const cube = new ColorCube(scene, position, color);
+    placedCubes.set(key, { cube, colorId });
+  });
   });
 
   colyseusConnection.onMatchStatusChange((status) => {
@@ -267,6 +270,22 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
   const positionMatches = (posA: Vector3, posB: Vector3, tolerance = 0.05) =>
     Math.abs(posA.x - posB.x) < tolerance && Math.abs(posA.z - posB.z) < tolerance;
 
+  const hasCubeAt = (x: number, z: number) => placedCubes.has(`${x},${z}`);
+  const getColorAt = (x: number, z: number) => placedCubes.get(`${x},${z}`)?.colorId;
+  const removeCubeAt = (position: Vector3) => {
+    const key = gridKey(position);
+    const existing = placedCubes.get(key);
+    if (!existing) {
+      return;
+    }
+    existing.cube.mesh.dispose();
+    placedCubes.delete(key);
+    colyseusConnection.sendRemoveCube({
+      position: { x: position.x, y: position.y, z: position.z }
+    });
+  };
+  player.setDrawingAccess({ getColorAt, hasCubeAt, removeCubeAt });
+
   player.setDestinationCallback((position) => {
     if (!pendingPlacement) {
       if (!pendingRemoval) {
@@ -275,19 +294,7 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
       if (!positionMatches(position, pendingRemoval.position)) {
         return;
       }
-      const key = gridKey(pendingRemoval.position);
-      const existing = placedCubes.get(key);
-      if (existing) {
-        existing.mesh.dispose();
-        placedCubes.delete(key);
-        colyseusConnection.sendRemoveCube({
-          position: {
-            x: pendingRemoval.position.x,
-            y: pendingRemoval.position.y,
-            z: pendingRemoval.position.z
-          }
-        });
-      }
+      removeCubeAt(pendingRemoval.position);
       pendingRemoval = null;
       return;
     }
@@ -297,10 +304,12 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
     const key = gridKey(pendingPlacement.position);
     const existing = placedCubes.get(key);
     if (existing) {
-      existing.mesh.dispose();
+      existing.cube.mesh.dispose();
     }
     const cube = new ColorCube(scene, pendingPlacement.position, pendingPlacement.color);
-    placedCubes.set(key, cube);
+    const colorId = colorToPaletteId(pendingPlacement.color);
+    placedCubes.set(key, { cube, colorId });
+    player.checkDrawingsAt(pendingPlacement.position);
     colyseusConnection.sendPlaceCube({
       position: {
         x: pendingPlacement.position.x,
