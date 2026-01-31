@@ -12,6 +12,13 @@ type MatchTimePayload = { time: number };
 type ScoreboardEntry = { id: string; name: string; score: number };
 type ScoreboardPayload = { entries: ScoreboardEntry[] };
 type MatchStatusPayload = { status: number };
+type QuickAttackPayload = {
+  id: string;
+  position: { x: number; y: number; z: number };
+  direction: { x: number; y: number; z: number };
+  speed?: number;
+  distance?: number;
+};
 
 export enum MatchStatusCode {
   Play = 1,
@@ -32,6 +39,7 @@ export class ColyseusConnection {
   private matchTimeListeners: Array<(seconds: number) => void> = [];
   private matchStatusListeners: Array<(status: number) => void> = [];
   private scoreboardListeners: Array<(entries: ScoreboardEntry[]) => void> = [];
+  private quickAttackListeners: Array<(payload: QuickAttackPayload) => void> = [];
   private matchStatus = MatchStatusCode.Play;
   private latestScoreboard: ScoreboardEntry[] = [];
 
@@ -118,6 +126,12 @@ export class ColyseusConnection {
         this.latestScoreboard = message.entries;
         this.scoreboardListeners.forEach((listener) => listener(message.entries));
       }
+    });
+    room.onMessage("playerQuickAttack", (message: QuickAttackPayload) => {
+      if (!message?.id || message.id === room.sessionId) {
+        return;
+      }
+      this.quickAttackListeners.forEach((listener) => listener(message));
     });
 
     room.onMessage("playerJoined", (message: RemotePlayerInfo) => {
@@ -234,6 +248,10 @@ export class ColyseusConnection {
     }
   }
 
+  onRemoteQuickAttack(callback: (payload: QuickAttackPayload) => void) {
+    this.quickAttackListeners.push(callback);
+  }
+
   isMatchPaused() {
     return this.matchStatus === MatchStatusCode.Pause;
   }
@@ -243,6 +261,18 @@ export class ColyseusConnection {
       return;
     }
     this.room.send("playerMove", { position });
+  }
+
+  sendQuickAttack(payload: {
+    position: { x: number; y: number; z: number };
+    direction: { x: number; y: number; z: number };
+    speed: number;
+    distance: number;
+  }) {
+    if (!this.room) {
+      return;
+    }
+    this.room.send("quickAttack", payload);
   }
 }
 

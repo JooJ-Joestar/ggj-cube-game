@@ -51,6 +51,30 @@ export class MyRoom extends Room<MyRoomState> {
         position: message.position
       });
     });
+
+    this.onMessage(
+      "quickAttack",
+      (
+        client,
+        message: {
+          position?: { x: number; y: number; z: number };
+          direction?: { x: number; y: number; z: number };
+          speed?: number;
+          distance?: number;
+        }
+      ) => {
+        if (!message?.position || !message?.direction) {
+          return;
+        }
+        this.broadcast("playerQuickAttack", {
+          id: client.sessionId,
+          position: message.position,
+          direction: message.direction,
+          speed: message.speed,
+          distance: message.distance
+        });
+      }
+    );
   }
 
   async onJoin(client: Client, options: any) {

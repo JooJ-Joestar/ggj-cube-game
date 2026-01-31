@@ -87,6 +87,23 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
     remaining: number;
     speed: number;
   }> = [];
+  const spawnQuickAttack = (
+    position: Vector3,
+    direction: Vector3,
+    distance: number,
+    speed: number
+  ) => {
+    const size = 0.5;
+    const attack = MeshBuilder.CreateBox("quickAttack", { size }, scene);
+    attack.position = position.clone();
+    attack.position.y = size / 2;
+    projectiles.push({
+      mesh: attack,
+      direction,
+      remaining: distance,
+      speed
+    });
+  };
 
   const spawnRemotePlayer = (id: string) => {
     if (remotePlayers.has(id)) {
@@ -123,6 +140,22 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
     remote.mesh.dispose();
     remotePlayers.delete(id);
     ui.removeRemotePlayerLabel(id);
+  });
+
+  colyseusConnection.onRemoteQuickAttack((payload) => {
+    const direction = new Vector3(
+      payload.direction.x,
+      payload.direction.y,
+      payload.direction.z
+    );
+    if (direction.lengthSquared() < 0.0001) {
+      direction.copyFromFloats(0, 0, 1);
+    }
+    direction.normalize();
+    const origin = new Vector3(payload.position.x, payload.position.y, payload.position.z);
+    const distance = payload.distance ?? player.getQuickAttackDistance();
+    const speed = payload.speed ?? player.getQuickAttackSpeed();
+    spawnQuickAttack(origin, direction, distance, speed);
   });
 
   colyseusConnection.onMatchStatusChange((status) => {
@@ -175,15 +208,15 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
       direction.copyFromFloats(0, 0, 1);
     }
     direction.normalize();
-    const size = 0.5;
-    const attack = MeshBuilder.CreateBox("quickAttack", { size }, scene);
-    attack.position = player.mesh.position.clone();
-    attack.position.y = size / 2;
-    projectiles.push({
-      mesh: attack,
-      direction,
-      remaining: player.getQuickAttackDistance(),
-      speed: player.getQuickAttackSpeed()
+    const distance = player.getQuickAttackDistance();
+    const speed = player.getQuickAttackSpeed();
+    const origin = player.mesh.position.clone();
+    spawnQuickAttack(origin, direction, distance, speed);
+    colyseusConnection.sendQuickAttack({
+      position: { x: origin.x, y: origin.y, z: origin.z },
+      direction: { x: direction.x, y: direction.y, z: direction.z },
+      speed,
+      distance
     });
   };
 
