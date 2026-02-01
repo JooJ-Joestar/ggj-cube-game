@@ -19,6 +19,15 @@ type QuickAttackPayload = {
   speed?: number;
   distance?: number;
 };
+type SoldierSpecialPayload = {
+  id: string;
+  position: { x: number; y: number; z: number };
+  direction: { x: number; y: number; z: number };
+  speed?: number;
+  distance?: number;
+  explosionSize?: number;
+  damage?: number;
+};
 type HealthUpdatePayload = { id: string; health: number };
 type PlayerHitPayload = { id: string };
 type PlayerClassPayload = { id: string; className: string };
@@ -58,6 +67,7 @@ export class ColyseusConnection {
   private matchStatusListeners: Array<(status: number) => void> = [];
   private scoreboardListeners: Array<(entries: ScoreboardEntry[]) => void> = [];
   private quickAttackListeners: Array<(payload: QuickAttackPayload) => void> = [];
+  private soldierSpecialListeners: Array<(payload: SoldierSpecialPayload) => void> = [];
   private healthListeners: Array<(payload: HealthUpdatePayload) => void> = [];
   private respawnListeners: Array<(payload: HealthUpdatePayload) => void> = [];
   private hitListeners: Array<(payload: PlayerHitPayload) => void> = [];
@@ -164,6 +174,12 @@ export class ColyseusConnection {
         return;
       }
       this.quickAttackListeners.forEach((listener) => listener(message));
+    });
+    room.onMessage("playerSoldierSpecial", (message: SoldierSpecialPayload) => {
+      if (!message?.id || message.id === room.sessionId) {
+        return;
+      }
+      this.soldierSpecialListeners.forEach((listener) => listener(message));
     });
     room.onMessage("playerHealthUpdate", (message: HealthUpdatePayload) => {
       if (!message?.id || typeof message.health !== "number") {
@@ -339,6 +355,10 @@ export class ColyseusConnection {
     }
   }
 
+  onSoldierSpecial(callback: (payload: SoldierSpecialPayload) => void) {
+    this.soldierSpecialListeners.push(callback);
+  }
+
   onRemoteQuickAttack(callback: (payload: QuickAttackPayload) => void) {
     this.quickAttackListeners.push(callback);
   }
@@ -388,6 +408,20 @@ export class ColyseusConnection {
       return;
     }
     this.room.send("quickAttack", payload);
+  }
+
+  sendSoldierSpecial(payload: {
+    position: { x: number; y: number; z: number };
+    direction: { x: number; y: number; z: number };
+    speed: number;
+    distance: number;
+    explosionSize: number;
+    damage: number;
+  }) {
+    if (!this.room) {
+      return;
+    }
+    this.room.send("soldierSpecial", payload);
   }
 
   sendPlayerClass(payload: { className: string }) {

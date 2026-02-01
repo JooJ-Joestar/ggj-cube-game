@@ -82,22 +82,38 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
   let localPlayerId = "";
   let currentMode: PlayerMode = ui.getMode();
   let matchPaused = colyseusConnection.isMatchPaused();
-  const getEnvNumber = (key: string, fallback: number) => {
-    const raw = process.env[key];
+  const getEnvNumber = (raw: string | undefined, fallback: number) => {
     if (raw === undefined) {
       return fallback;
     }
-    const parsed = Number(raw);
+    const match = String(raw).match(/-?\d+(\.\d+)?/);
+    if (!match) {
+      return fallback;
+    }
+    const parsed = Number(match[0]);
     return Number.isFinite(parsed) ? parsed : fallback;
   };
 
   let lastQuickAttackAt = 0;
   let nextQuickAttackReadyAt = 0;
   let quickAttackEnabled = true;
-  const scoutSpecialCooldownMs = getEnvNumber("SCOUT_SPECIAL_COOLDOWN_MS", 5000);
-  let lastSpecialAt = 0;
+  const scoutSpecialCooldownMs = getEnvNumber(
+    process.env.SCOUT_SPECIAL_COOLDOWN_MS,
+    5000
+  );
   let nextSpecialReadyAt = 0;
   let specialReady = true;
+  const soldierSpecialCooldownMs = getEnvNumber(
+    process.env.SOLDIER_SPECIAL_COOLDOWN_MS,
+    4000
+  );
+  const soldierSpecialSpeed = getEnvNumber(process.env.SOLDIER_SPECIAL_SPEED, 30);
+  const soldierSpecialDistance = getEnvNumber(process.env.SOLDIER_SPECIAL_DISTANCE, 30);
+  const soldierSpecialExplosionSize = getEnvNumber(
+    process.env.SOLDIER_SPECIAL_EXPLOSION_SIZE,
+    5
+  );
+  const soldierSpecialDamage = getEnvNumber(process.env.SOLDIER_SPECIAL_DAMAGE, 90);
   const getRandomSpawnPosition = () => {
     const range = 2;
     const x = Math.round((Math.random() * 2 - 1) * range);
@@ -111,7 +127,11 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
     remaining: number;
     speed: number;
     ownerId: string;
+    type: "quick" | "soldier";
+    explosionSize?: number;
+    damage?: number;
   }> = [];
+  const debris: Array<{ mesh: any; velocity: Vector3; remainingMs: number }> = [];
   const spawnQuickAttack = (
     position: Vector3,
     direction: Vector3,
@@ -128,8 +148,103 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
       direction,
       remaining: distance,
       speed,
-      ownerId
+      ownerId,
+      type: "quick"
     });
+  };
+
+  const spawnSoldierSpecial = (
+    position: Vector3,
+    direction: Vector3,
+    distance: number,
+    speed: number,
+    ownerId: string,
+    explosionSize: number,
+    damage: number
+  ) => {
+    const size = 0.75;
+    const attack = MeshBuilder.CreateBox("soldierSpecial", { size }, scene);
+    attack.position = position.clone();
+    attack.position.y = size / 2;
+    const material = new StandardMaterial("soldierSpecialMat", scene);
+    material.diffuseColor = new Color3(1, 0, 0);
+    attack.material = material;
+    projectiles.push({
+      mesh: attack,
+      direction,
+      remaining: distance,
+      speed,
+      ownerId,
+      type: "soldier",
+      explosionSize,
+      damage
+    });
+  };
+
+  const spawnExplosionDebris = (center: Vector3, count = 12) => {
+    for (let i = 0; i < count; i++) {
+      const shard = MeshBuilder.CreateBox(`debris-${i}`, { size: 0.25 }, scene);
+      shard.position = center.clone();
+      shard.position.y += 0.25;
+      const mat = new StandardMaterial(`debris-mat-${i}`, scene);
+      mat.diffuseColor = new Color3(1, 0.5, 0.1);
+      shard.material = mat;
+      const velocity = new Vector3(
+        (Math.random() * 2 - 1) * 6,
+        Math.random() * 6 + 4,
+        (Math.random() * 2 - 1) * 6
+      );
+      debris.push({ mesh: shard, velocity, remainingMs: 1000 });
+    }
+  };
+
+  const triggerExplosion = (
+    center: Vector3,
+    ownerId: string,
+    explosionSize: number,
+    damage: number
+  ) => {
+    const size = Math.max(0.1, explosionSize);
+    const explosion = MeshBuilder.CreateBox("explosion", { size }, scene);
+    explosion.position = center.clone();
+    explosion.position.y = size / 2;
+    const mat = new StandardMaterial("explosionMat", scene);
+    mat.diffuseColor = new Color3(1, 0.2, 0);
+    mat.alpha = 0.3;
+    explosion.material = mat;
+    setTimeout(() => explosion.dispose(), 200);
+    spawnExplosionDebris(center);
+
+    if (ownerId && ownerId !== localPlayerId) {
+      const half = size / 2;
+      const pos = player.mesh.position;
+      if (
+        Math.abs(pos.x - center.x) <= half &&
+        Math.abs(pos.y - center.y) <= half &&
+        Math.abs(pos.z - center.z) <= half &&
+        !player.isInvincible()
+      ) {
+        const applied = player.applyDamage(damage);
+        if (applied > 0) {
+          ui.updatePlayerHealth(localPlayerId, player.getHealth(), 100);
+          colyseusConnection.sendPlayerHealthUpdate({
+            id: localPlayerId,
+            health: player.getHealth()
+          });
+          colyseusConnection.sendPlayerHit({ id: localPlayerId });
+          colyseusConnection.sendAddPlayerScore({
+            id: ownerId,
+            amount: applied
+          });
+          if (player.getDamageCooldownTime() > 0) {
+            player.setInvincibleForSeconds(player.getDamageCooldownTime());
+          }
+          if (player.getHealth() <= 0) {
+            colyseusConnection.sendRespawn({ id: localPlayerId });
+          }
+        }
+      }
+    }
   };
 
   const spawnRemotePlayer = (id: string, className?: string) => {
@@ -200,6 +315,28 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
     const distance = payload.distance ?? player.getQuickAttackDistance();
     const speed = payload.speed ?? player.getQuickAttackSpeed();
     spawnQuickAttack(origin, direction, distance, speed, payload.id);
+  });
+
+  colyseusConnection.onSoldierSpecial((payload) => {
+    const direction = new Vector3(
+      payload.direction.x,
+      payload.direction.y,
+      payload.direction.z
+    );
+    if (direction.lengthSquared() < 0.0001) {
+      direction.copyFromFloats(0, 0, 1);
+    }
+    direction.normalize();
+    const origin = new Vector3(payload.position.x, payload.position.y, payload.position.z);
+    spawnSoldierSpecial(
+      origin,
+      direction,
+      payload.distance ?? soldierSpecialDistance,
+      payload.speed ?? soldierSpecialSpeed,
+      payload.id,
+      payload.explosionSize ?? soldierSpecialExplosionSize,
+      payload.damage ?? soldierSpecialDamage
+    );
   });
 
   colyseusConnection.onCubePlaced((payload) => {
@@ -388,40 +525,79 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
       distance
     });
   };
+  const startSpecialCooldown = (cooldownMs: number) => {
+    const now = performance.now();
+    if (cooldownMs <= 0) {
+      specialReady = true;
+      ui.setSpecialEnabled(true);
+      return true;
+    }
+    if (!specialReady && now < nextSpecialReadyAt) {
+      return false;
+    }
+    specialReady = false;
+    nextSpecialReadyAt = now + cooldownMs;
+    ui.setSpecialEnabled(false);
+    return true;
+  };
   ui.onSpecial = () => {
     if (matchPaused) {
       return;
     }
-    if (!player.isScoutApplied()) {
+    if (!specialReady) {
       return;
     }
-    const now = performance.now();
-    if (scoutSpecialCooldownMs > 0 && now - lastSpecialAt < scoutSpecialCooldownMs) {
-      return;
-    }
-    lastSpecialAt = now;
-    nextSpecialReadyAt = now + scoutSpecialCooldownMs;
-    specialReady = scoutSpecialCooldownMs <= 0;
-    ui.setSpecialEnabled(specialReady);
+    const className = player.getCurrentClass();
     const direction = player.getFacingDirection();
     direction.y = 0;
     if (direction.lengthSquared() < 0.0001) {
       direction.copyFromFloats(0, 0, 1);
     }
     direction.normalize();
-    const multipliers = player.getScoutSpecialMultipliers();
-    const distance = player.getQuickAttackDistance() * multipliers.distance;
-    const speed = player.getQuickAttackSpeed() * multipliers.speed;
     const origin = player.mesh.position.clone();
-    if (localPlayerId) {
-      spawnQuickAttack(origin, direction, distance, speed, localPlayerId);
+    if (className === "scout") {
+      if (!startSpecialCooldown(scoutSpecialCooldownMs)) {
+        return;
+      }
+      const multipliers = player.getScoutSpecialMultipliers();
+      const distance = player.getQuickAttackDistance() * multipliers.distance;
+      const speed = player.getQuickAttackSpeed() * multipliers.speed;
+      if (localPlayerId) {
+        spawnQuickAttack(origin, direction, distance, speed, localPlayerId);
+      }
+      colyseusConnection.sendQuickAttack({
+        position: { x: origin.x, y: origin.y, z: origin.z },
+        direction: { x: direction.x, y: direction.y, z: direction.z },
+        speed,
+        distance
+      });
+      return;
     }
-    colyseusConnection.sendQuickAttack({
-      position: { x: origin.x, y: origin.y, z: origin.z },
-      direction: { x: direction.x, y: direction.y, z: direction.z },
-      speed,
-      distance
-    });
+
+    if (className === "soldier") {
+      if (!startSpecialCooldown(soldierSpecialCooldownMs)) {
+        return;
+      }
+      if (localPlayerId) {
+        spawnSoldierSpecial(
+          origin,
+          direction,
+          soldierSpecialDistance,
+          soldierSpecialSpeed,
+          localPlayerId,
+          soldierSpecialExplosionSize,
+          soldierSpecialDamage
+        );
+      }
+      colyseusConnection.sendSoldierSpecial({
+        position: { x: origin.x, y: origin.y, z: origin.z },
+        direction: { x: direction.x, y: direction.y, z: direction.z },
+        speed: soldierSpecialSpeed,
+        distance: soldierSpecialDistance,
+        explosionSize: soldierSpecialExplosionSize,
+        damage: soldierSpecialDamage
+      });
+    }
   };
 
   scene.onPointerObservable.add((pointerInfo) => {
@@ -478,39 +654,94 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
         const step = Math.min(projectile.speed * deltaSeconds, projectile.remaining);
         projectile.mesh.position.addInPlace(projectile.direction.scale(step));
         projectile.remaining -= step;
-        if (
-          projectile.ownerId &&
-          projectile.ownerId !== localPlayerId &&
-          !player.isInvincible() &&
-          projectile.mesh.intersectsMesh(player.mesh, false)
-        ) {
-          const damage = player.getQuickAttackDamage();
-          const applied = player.applyDamage(damage);
-          if (applied > 0) {
-            ui.updatePlayerHealth(localPlayerId, player.getHealth(), 100);
-            colyseusConnection.sendPlayerHealthUpdate({
-              id: localPlayerId,
-              health: player.getHealth()
-            });
-            colyseusConnection.sendPlayerHit({ id: localPlayerId });
-            colyseusConnection.sendAddPlayerScore({
-              id: projectile.ownerId,
-              amount: applied
-            });
-            if (player.getDamageCooldownTime() > 0) {
-              player.setInvincibleForSeconds(player.getDamageCooldownTime());
+        if (projectile.type === "soldier" && projectile.ownerId === localPlayerId) {
+          let hitRemote = false;
+          for (const remote of remotePlayers.values()) {
+            if (projectile.mesh.intersectsMesh(remote.mesh, false)) {
+              hitRemote = true;
+              break;
             }
-            if (player.getHealth() <= 0) {
-              colyseusConnection.sendRespawn({ id: localPlayerId });
+          }
+          if (hitRemote) {
+            triggerExplosion(
+              projectile.mesh.position.clone(),
+              projectile.ownerId,
+              projectile.explosionSize ?? soldierSpecialExplosionSize,
+              projectile.damage ?? soldierSpecialDamage
+            );
+            projectile.mesh.dispose();
+            projectiles.splice(i, 1);
+            continue;
+          }
+        }
+        if (projectile.ownerId && projectile.ownerId !== localPlayerId) {
+          if (
+            projectile.type === "soldier" &&
+            projectile.mesh.intersectsMesh(player.mesh, false)
+          ) {
+            triggerExplosion(
+              projectile.mesh.position.clone(),
+              projectile.ownerId,
+              projectile.explosionSize ?? soldierSpecialExplosionSize,
+              projectile.damage ?? soldierSpecialDamage
+            );
+            projectile.mesh.dispose();
+            projectiles.splice(i, 1);
+            continue;
+          }
+          if (
+            projectile.type === "quick" &&
+            !player.isInvincible() &&
+            projectile.mesh.intersectsMesh(player.mesh, false)
+          ) {
+            const damage = player.getQuickAttackDamage();
+            const applied = player.applyDamage(damage);
+            if (applied > 0) {
+              ui.updatePlayerHealth(localPlayerId, player.getHealth(), 100);
+              colyseusConnection.sendPlayerHealthUpdate({
+                id: localPlayerId,
+                health: player.getHealth()
+              });
+              colyseusConnection.sendPlayerHit({ id: localPlayerId });
+              colyseusConnection.sendAddPlayerScore({
+                id: projectile.ownerId,
+                amount: applied
+              });
+              if (player.getDamageCooldownTime() > 0) {
+                player.setInvincibleForSeconds(player.getDamageCooldownTime());
+              }
+              if (player.getHealth() <= 0) {
+                colyseusConnection.sendRespawn({ id: localPlayerId });
+              }
             }
+            projectile.mesh.dispose();
+            projectiles.splice(i, 1);
+            continue;
+          }
+        }
+        if (projectile.remaining <= 0) {
+          if (projectile.type === "soldier") {
+            triggerExplosion(
+              projectile.mesh.position.clone(),
+              projectile.ownerId,
+              projectile.explosionSize ?? soldierSpecialExplosionSize,
+              projectile.damage ?? soldierSpecialDamage
+            );
           }
           projectile.mesh.dispose();
           projectiles.splice(i, 1);
-          continue;
         }
-        if (projectile.remaining <= 0) {
-          projectile.mesh.dispose();
-          projectiles.splice(i, 1);
+      }
+    }
+    if (debris.length) {
+      for (let i = debris.length - 1; i >= 0; i--) {
+        const shard = debris[i];
+        shard.remainingMs -= engine.getDeltaTime();
+        shard.mesh.position.addInPlace(shard.velocity.scale(deltaSeconds));
+        shard.velocity.y -= 9.8 * deltaSeconds;
+        if (shard.remainingMs <= 0) {
+          shard.mesh.dispose();
+          debris.splice(i, 1);
         }
       }
     }

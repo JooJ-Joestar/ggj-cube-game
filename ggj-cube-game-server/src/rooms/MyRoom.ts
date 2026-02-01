@@ -92,6 +92,34 @@ export class MyRoom extends Room<MyRoomState> {
     );
 
     this.onMessage(
+      "soldierSpecial",
+      (
+        client,
+        message: {
+          position?: { x: number; y: number; z: number };
+          direction?: { x: number; y: number; z: number };
+          speed?: number;
+          distance?: number;
+          explosionSize?: number;
+          damage?: number;
+        }
+      ) => {
+        if (!message?.position || !message?.direction) {
+          return;
+        }
+        this.broadcast("playerSoldierSpecial", {
+          id: client.sessionId,
+          position: message.position,
+          direction: message.direction,
+          speed: message.speed,
+          distance: message.distance,
+          explosionSize: message.explosionSize,
+          damage: message.damage
+        });
+      }
+    );
+
+    this.onMessage(
       "placeCube",
       (
         client,
