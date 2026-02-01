@@ -102,6 +102,7 @@ export class MyRoom extends Room<MyRoomState> {
           distance?: number;
           explosionSize?: number;
           damage?: number;
+          type?: "soldier" | "engineer";
         }
       ) => {
         if (!message?.position || !message?.direction) {
@@ -114,8 +115,29 @@ export class MyRoom extends Room<MyRoomState> {
           speed: message.speed,
           distance: message.distance,
           explosionSize: message.explosionSize,
-          damage: message.damage
+          damage: message.damage,
+          type: message.type
         });
+      }
+    );
+
+    this.onMessage(
+      "engineerTowerSpawn",
+      (client, message: { position?: { x: number; y: number; z: number } }) => {
+        if (!message?.position) {
+          return;
+        }
+        this.broadcast("engineerTowerSpawn", { id: client.sessionId, position: message.position });
+      }
+    );
+
+    this.onMessage(
+      "engineerTowerDespawn",
+      (client, message: { position?: { x: number; y: number; z: number } }) => {
+        if (!message?.position) {
+          return;
+        }
+        this.broadcast("engineerTowerDespawn", { id: client.sessionId, position: message.position });
       }
     );
 

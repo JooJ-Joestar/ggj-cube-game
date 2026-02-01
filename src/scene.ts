@@ -25,7 +25,14 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
   const scene = new Scene(engine);
 
   const camera = new ArcRotateCamera("camera", Math.PI / 2, Math.PI / 6, 36, Vector3.Zero(), scene);
-  camera.attachControl(canvas, true);
+  camera.inputs.clear();
+  camera.panningSensibility = 0;
+  camera.lowerAlphaLimit = camera.alpha;
+  camera.upperAlphaLimit = camera.alpha;
+  camera.lowerBetaLimit = camera.beta;
+  camera.upperBetaLimit = camera.beta;
+  camera.lowerRadiusLimit = camera.radius;
+  camera.upperRadiusLimit = camera.radius;
 
   const light = new HemisphericLight("hemisphericLight", new Vector3(0, 1, 0), scene);
   light.intensity = 0.95;
@@ -119,10 +126,16 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
     process.env.ENGINEER_TOWER_PROJECTILE_DAMAGE,
     90
   );
+  const engineerTowerShotCooldownMs = getEnvNumber(
+    process.env.ENGINEER_TOWER_SHOT_COOLDOWN_MS,
+    500
+  );
   const engineerTowerSize = 5;
   const engineerTowerBlocks: Mesh[] = [];
+  const remoteEngineerTowers = new Map<string, Mesh[]>();
   let towerActive = false;
   let towerBasePosition: Vector3 | null = null;
+  let lastTowerShotAt = 0;
   const soldierSpecialCooldownMs = getEnvNumber(
     process.env.SOLDIER_SPECIAL_COOLDOWN_MS,
     4000
@@ -147,7 +160,7 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
     remaining: number;
     speed: number;
     ownerId: string;
-    type: "quick" | "soldier";
+    type: "quick" | "soldier" | "engineer";
     explosionSize?: number;
     damage?: number;
   }> = [];
@@ -181,7 +194,8 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
     speed: number,
     ownerId: string,
     explosionSize: number,
-    damage: number
+    damage: number,
+    projectileType: "soldier" | "engineer" = "soldier"
   ) => {
     const size = 0.75;
     const attack = MeshBuilder.CreateBox("soldierSpecial", { size }, scene);
@@ -197,7 +211,7 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
       remaining: distance,
       speed,
       ownerId,
-      type: "soldier",
+      type: projectileType,
       explosionSize,
       damage
     });
@@ -271,10 +285,11 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
     }
   };
 
-  const spawnEngineerTower = (basePosition: Vector3) => {
+  const spawnEngineerTower = (basePosition: Vector3, targetList?: Mesh[]) => {
     const half = Math.floor(engineerTowerSize / 2);
     const material = new StandardMaterial("engineerTowerMat", scene);
     material.diffuseColor = new Color3(0.6, 0.6, 0.6);
+    const blocks = targetList ?? engineerTowerBlocks;
     for (let y = 0; y < engineerTowerSize; y++) {
       for (let x = -half; x <= half; x++) {
         for (let z = -half; z <= half; z++) {
@@ -286,28 +301,35 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
           );
           block.material = material;
           block.renderingGroupId = 1;
-          engineerTowerBlocks.push(block);
+          blocks.push(block);
         }
       }
     }
-    towerActive = true;
-    towerBasePosition = basePosition.clone();
-    player.setMovementEnabled(false);
-    ui.setTowerMode(true);
+    if (!targetList) {
+      towerActive = true;
+      towerBasePosition = basePosition.clone();
+      player.setMovementEnabled(false);
+      ui.setTowerMode(true);
+    }
   };
 
-  const despawnEngineerTower = () => {
-    for (const block of engineerTowerBlocks) {
+  const despawnEngineerTower = (targetList?: Mesh[], skipCooldown = false) => {
+    const blocks = targetList ?? engineerTowerBlocks;
+    for (const block of blocks) {
       block.dispose();
     }
-    engineerTowerBlocks.length = 0;
-    towerActive = false;
-    towerBasePosition = null;
-    player.setMovementEnabled(true);
-    ui.setTowerMode(false);
-    engineerTowerReady = false;
-    nextEngineerTowerReadyAt = performance.now() + engineerTowerCooldownMs;
-    ui.setSpecialEnabled(false);
+    blocks.length = 0;
+    if (!targetList) {
+      towerActive = false;
+      towerBasePosition = null;
+      player.setMovementEnabled(true);
+      ui.setTowerMode(false);
+      if (!skipCooldown) {
+        engineerTowerReady = false;
+        nextEngineerTowerReadyAt = performance.now() + engineerTowerCooldownMs;
+        ui.setSpecialEnabled(false);
+      }
+    }
   };
 
   const spawnRemotePlayer = (id: string, className?: string) => {
@@ -398,8 +420,29 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
       payload.speed ?? soldierSpecialSpeed,
       payload.id,
       payload.explosionSize ?? soldierSpecialExplosionSize,
-      payload.damage ?? soldierSpecialDamage
+      payload.damage ?? soldierSpecialDamage,
+      payload.type === "engineer" ? "engineer" : "soldier"
     );
+  });
+
+  colyseusConnection.onEngineerTowerSpawn(({ id, position }) => {
+    const base = new Vector3(position.x, position.y, position.z);
+    const existing = remoteEngineerTowers.get(id);
+    if (existing) {
+      despawnEngineerTower(existing, true);
+    }
+    const blocks: Mesh[] = [];
+    remoteEngineerTowers.set(id, blocks);
+    spawnEngineerTower(base, blocks);
+  });
+
+  colyseusConnection.onEngineerTowerDespawn(({ id }) => {
+    const blocks = remoteEngineerTowers.get(id);
+    if (!blocks) {
+      return;
+    }
+    despawnEngineerTower(blocks, true);
+    remoteEngineerTowers.delete(id);
   });
 
   colyseusConnection.onCubePlaced((payload) => {
@@ -472,10 +515,18 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
       player.setHealth(health);
       player.setInvincibleForSeconds(player.getDamageCooldownTime());
       player.setPosition(getRandomSpawnPosition());
+      if (towerActive) {
+        despawnEngineerTower(undefined, true);
+      }
     } else {
       const remote = remotePlayers.get(id);
       if (remote) {
         remote.setPosition(getRandomSpawnPosition());
+      }
+      const blocks = remoteEngineerTowers.get(id);
+      if (blocks) {
+        despawnEngineerTower(blocks, true);
+        remoteEngineerTowers.delete(id);
       }
     }
     ui.updatePlayerHealth(id, health, 100);
@@ -664,7 +715,8 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
         speed: soldierSpecialSpeed,
         distance: soldierSpecialDistance,
         explosionSize: soldierSpecialExplosionSize,
-        damage: soldierSpecialDamage
+        damage: soldierSpecialDamage,
+        type: "soldier"
       });
       return;
     }
@@ -673,7 +725,11 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
       if (!engineerTowerReady || towerActive) {
         return;
       }
-      spawnEngineerTower(new Vector3(Math.round(origin.x), 0, Math.round(origin.z)));
+      const towerPosition = new Vector3(Math.round(origin.x), 0, Math.round(origin.z));
+      spawnEngineerTower(towerPosition);
+      colyseusConnection.sendEngineerTowerSpawn({
+        position: { x: towerPosition.x, y: towerPosition.y, z: towerPosition.z }
+      });
     }
   };
 
@@ -681,7 +737,11 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
     if (!towerActive) {
       return;
     }
+    const towerPosition = towerBasePosition?.clone() ?? player.mesh.position.clone();
     despawnEngineerTower();
+    colyseusConnection.sendEngineerTowerDespawn({
+      position: { x: towerPosition.x, y: towerPosition.y, z: towerPosition.z }
+    });
   };
 
   scene.onPointerObservable.add((pointerInfo) => {
@@ -693,8 +753,13 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
     }
     if (pointerInfo.type === PointerEventTypes.POINTERDOWN) {
       if (towerActive && towerBasePosition) {
+        const now = performance.now();
+        if (engineerTowerShotCooldownMs > 0 && now - lastTowerShotAt < engineerTowerShotCooldownMs) {
+          return;
+        }
         const pick = scene.pick(scene.pointerX, scene.pointerY, (mesh) => mesh === ground);
         if (pick && pick.hit && pick.pickedPoint) {
+          lastTowerShotAt = now;
           const target = new Vector3(
             Math.round(pick.pickedPoint.x),
             towerBasePosition.y,
@@ -720,8 +785,18 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
               engineerTowerProjectileSpeed,
               localPlayerId,
               engineerTowerExplosionSize,
-              engineerTowerProjectileDamage
+              engineerTowerProjectileDamage,
+              "engineer"
             );
+            colyseusConnection.sendSoldierSpecial({
+              position: { x: origin.x, y: origin.y, z: origin.z },
+              direction: { x: direction.x, y: direction.y, z: direction.z },
+              speed: engineerTowerProjectileSpeed,
+              distance: distance || 1,
+              explosionSize: engineerTowerExplosionSize,
+              damage: engineerTowerProjectileDamage,
+              type: "engineer"
+            });
           }
         }
         return;
@@ -843,7 +918,7 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
         }
         if (projectile.ownerId && projectile.ownerId !== localPlayerId) {
           if (
-            projectile.type === "soldier" &&
+            (projectile.type === "soldier" || projectile.type === "engineer") &&
             projectile.mesh.intersectsMesh(player.mesh, false)
           ) {
             triggerExplosion(
@@ -887,7 +962,7 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
           }
         }
         if (projectile.remaining <= 0) {
-          if (projectile.type === "soldier") {
+          if (projectile.type === "soldier" || projectile.type === "engineer") {
             triggerExplosion(
               projectile.mesh.position.clone(),
               projectile.ownerId,

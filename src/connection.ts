@@ -27,7 +27,9 @@ type SoldierSpecialPayload = {
   distance?: number;
   explosionSize?: number;
   damage?: number;
+  type?: "soldier" | "engineer";
 };
+type EngineerTowerPayload = { id: string; position: { x: number; y: number; z: number } };
 type HealthUpdatePayload = { id: string; health: number };
 type PlayerHitPayload = { id: string };
 type PlayerClassPayload = { id: string; className: string };
@@ -68,6 +70,8 @@ export class ColyseusConnection {
   private scoreboardListeners: Array<(entries: ScoreboardEntry[]) => void> = [];
   private quickAttackListeners: Array<(payload: QuickAttackPayload) => void> = [];
   private soldierSpecialListeners: Array<(payload: SoldierSpecialPayload) => void> = [];
+  private engineerTowerSpawnListeners: Array<(payload: EngineerTowerPayload) => void> = [];
+  private engineerTowerDespawnListeners: Array<(payload: EngineerTowerPayload) => void> = [];
   private healthListeners: Array<(payload: HealthUpdatePayload) => void> = [];
   private respawnListeners: Array<(payload: HealthUpdatePayload) => void> = [];
   private hitListeners: Array<(payload: PlayerHitPayload) => void> = [];
@@ -180,6 +184,18 @@ export class ColyseusConnection {
         return;
       }
       this.soldierSpecialListeners.forEach((listener) => listener(message));
+    });
+    room.onMessage("engineerTowerSpawn", (message: EngineerTowerPayload) => {
+      if (!message?.id || message.id === room.sessionId) {
+        return;
+      }
+      this.engineerTowerSpawnListeners.forEach((listener) => listener(message));
+    });
+    room.onMessage("engineerTowerDespawn", (message: EngineerTowerPayload) => {
+      if (!message?.id || message.id === room.sessionId) {
+        return;
+      }
+      this.engineerTowerDespawnListeners.forEach((listener) => listener(message));
     });
     room.onMessage("playerHealthUpdate", (message: HealthUpdatePayload) => {
       if (!message?.id || typeof message.health !== "number") {
@@ -359,6 +375,14 @@ export class ColyseusConnection {
     this.soldierSpecialListeners.push(callback);
   }
 
+  onEngineerTowerSpawn(callback: (payload: EngineerTowerPayload) => void) {
+    this.engineerTowerSpawnListeners.push(callback);
+  }
+
+  onEngineerTowerDespawn(callback: (payload: EngineerTowerPayload) => void) {
+    this.engineerTowerDespawnListeners.push(callback);
+  }
+
   onRemoteQuickAttack(callback: (payload: QuickAttackPayload) => void) {
     this.quickAttackListeners.push(callback);
   }
@@ -417,11 +441,26 @@ export class ColyseusConnection {
     distance: number;
     explosionSize: number;
     damage: number;
+    type?: "soldier" | "engineer";
   }) {
     if (!this.room) {
       return;
     }
     this.room.send("soldierSpecial", payload);
+  }
+
+  sendEngineerTowerSpawn(payload: { position: { x: number; y: number; z: number } }) {
+    if (!this.room) {
+      return;
+    }
+    this.room.send("engineerTowerSpawn", payload);
+  }
+
+  sendEngineerTowerDespawn(payload: { position: { x: number; y: number; z: number } }) {
+    if (!this.room) {
+      return;
+    }
+    this.room.send("engineerTowerDespawn", payload);
   }
 
   sendPlayerClass(payload: { className: string }) {
