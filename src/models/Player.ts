@@ -1,4 +1,4 @@
-import { Vector3, Mesh, Color3 } from "babylonjs";
+import { Vector3, Mesh, Color3, SpriteManager, Sprite } from "babylonjs";
 import { StandardMaterial } from "babylonjs";
 import { PlayerFactory } from "../factory/PlayerFactory";
 
@@ -6,6 +6,8 @@ export class Player {
   readonly mesh: Mesh;
   public id: string;
   private className = "none";
+  private thomasSprite: Sprite | null = null;
+  private defaultScaling = new Vector3(1, 1, 1);
   private quickAttackDistance = 5;
   private quickAttackSpeed = 12;
   private quickAttackCooldownMs = 300;
@@ -18,6 +20,7 @@ export class Player {
   constructor(factory: PlayerFactory, id: string, public isLocal: boolean) {
     this.id = id;
     this.mesh = factory.createPlayerMesh(1, undefined, isLocal ? "LocalPlayer" : `RemotePlayer-${id}`);
+    this.defaultScaling = this.mesh.scaling.clone();
   }
 
   setPosition(position: Vector3) {
@@ -31,6 +34,10 @@ export class Player {
     }
   }
 
+  setClassName(name: string) {
+    this.className = name.trim().toLowerCase() || "none";
+  }
+
   setClassColor(className: string) {
     const normalized = className.trim().toLowerCase();
     this.className = normalized || "none";
@@ -41,6 +48,56 @@ export class Player {
     return this.className;
   }
 
+  setThomasActive(
+    active: boolean,
+    spriteManager?: SpriteManager,
+    sprite?: { pixelWidth: number; pixelHeight: number; displayHeight: number }
+  ) {
+    if (active) {
+      this.className = "thomas";
+      this.mesh.isVisible = false;
+      this.mesh.scaling.set(2, 2, 2);
+      if (!this.thomasSprite && spriteManager) {
+        this.thomasSprite = new Sprite("thomasSprite", spriteManager);
+        const displayHeight = sprite?.displayHeight ?? 2.5;
+        const ratio =
+          sprite && sprite.pixelHeight > 0
+            ? sprite.pixelWidth / sprite.pixelHeight
+            : 1;
+        this.thomasSprite.size = displayHeight;
+        if ((this.thomasSprite as any).width !== undefined) {
+          (this.thomasSprite as any).width = displayHeight * ratio;
+        }
+        if ((this.thomasSprite as any).height !== undefined) {
+          (this.thomasSprite as any).height = displayHeight;
+        }
+      }
+      if (this.thomasSprite) {
+        this.thomasSprite.isVisible = true;
+        this.updateThomasSpritePosition();
+      }
+      return;
+    }
+
+    this.mesh.isVisible = true;
+    this.mesh.scaling.copyFrom(this.defaultScaling);
+    if (this.thomasSprite) {
+      this.thomasSprite.isVisible = false;
+    }
+    if (this.className === "thomas") {
+      this.className = "none";
+    }
+  }
+
+  updateThomasSpritePosition() {
+    if (!this.thomasSprite) {
+      return;
+    }
+    this.thomasSprite.position.x = this.mesh.position.x;
+    this.thomasSprite.position.y = this.mesh.position.y + 2.75;
+    this.thomasSprite.position.z = this.mesh.position.z;
+  }
+
   static getClassColor(className: string) {
     switch (className.trim().toLowerCase()) {
       case "engineer":
@@ -48,6 +105,8 @@ export class Player {
       case "soldier":
         return new Color3(0, 0.4, 0.45);
       case "scout":
+        return new Color3(1, 1, 1);
+      case "thomas":
         return new Color3(1, 1, 1);
       case "none":
       default:

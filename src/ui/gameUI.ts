@@ -62,11 +62,12 @@ export class GameUI {
     this.debugPanel = new DebugPanel(this.gui);
     this.updateDebugInfo(connection);
 
-    this.attacks = new PlayerAttacks(this.gui);
+    this.attacks = new PlayerAttacks(this.gui, this.controls.getContainer());
     this.attacks.onQuickAttack = () => this.onQuickAttack();
     this.attacks.onSpecial = () => this.onSpecial();
     this.attacks.onDismantle = () => this.onDismantleTower();
   }
+
 
   getMode() {
     return this.controls.getMode();
@@ -114,6 +115,10 @@ export class GameUI {
 
   setTowerMode(active: boolean) {
     this.attacks.setTowerMode(active);
+  }
+
+  setCombatButtonsVisible(visible: boolean) {
+    this.attacks.setCombatButtonsVisible(visible);
   }
 
   attachRemotePlayerLabel(id: string, name: string, mesh: Mesh) {

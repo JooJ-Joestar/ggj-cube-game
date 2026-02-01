@@ -14,7 +14,7 @@ export class PlayerLabel {
     this.label.textVerticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
     this.label.height = "30px";
     this.label.width = "200px";
-    this.label.linkOffsetY = -60;
+    this.label.linkOffsetY = -90;
     this.label.isPointerBlocker = false;
     this.label.shadowColor = "black";
     this.label.shadowBlur = 8;

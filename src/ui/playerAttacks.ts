@@ -15,7 +15,7 @@ export class PlayerAttacks {
   public onSpecial: () => void = () => {};
   public onDismantle: () => void = () => {};
 
-  constructor(gui: AdvancedDynamicTexture) {
+  constructor(gui: AdvancedDynamicTexture, parent?: StackPanel) {
     this.container = new StackPanel();
     this.container.width = "180px";
     this.container.isVertical = true;
@@ -25,7 +25,11 @@ export class PlayerAttacks {
     this.container.paddingBottom = "16px";
     this.container.spacing = 8;
     this.container.isPointerBlocker = false;
-    gui.addControl(this.container);
+    if (parent) {
+      parent.addControl(this.container);
+    } else {
+      gui.addControl(this.container);
+    }
 
     this.quickAttackButton = this.createButton(
       "Quick attack",
@@ -62,6 +66,14 @@ export class PlayerAttacks {
     this.quickAttackButton.isVisible = !active;
     this.specialButton.isVisible = !active;
     this.dismantleButton.isVisible = active;
+  }
+
+  setCombatButtonsVisible(visible: boolean) {
+    this.quickAttackButton.isVisible = visible;
+    this.specialButton.isVisible = visible;
+    if (!visible) {
+      this.dismantleButton.isVisible = false;
+    }
   }
 
   private createButton(text: string, handler: () => void, canActivate?: () => boolean) {

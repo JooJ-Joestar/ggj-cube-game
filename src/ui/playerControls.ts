@@ -17,6 +17,7 @@ export class PlayerControls {
   private removeButton: Button;
   private paletteGrid: Grid;
   private scoreboardButton: Button;
+  private controlsStack: StackPanel;
   private selectedColor = new Color3(1, 0.4, 0);
   public onModeChange: (mode: PlayerMode) => void = () => {};
   public onScoreboardToggle: (visible: boolean) => void = () => {};
@@ -25,17 +26,17 @@ export class PlayerControls {
 
   constructor(gui: AdvancedDynamicTexture) {
     this.gui = gui;
-    const controlsStack = new StackPanel();
-    controlsStack.width = "180px";
-    controlsStack.isVertical = true;
-    controlsStack.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_RIGHT;
-    controlsStack.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-    controlsStack.paddingTop = "16px";
-    controlsStack.paddingRight = "16px";
-    controlsStack.spacing = 8;
-    controlsStack.isPointerBlocker = false;
-    controlsStack.isHitTestVisible = false;
-    gui.addControl(controlsStack);
+    this.controlsStack = new StackPanel();
+    this.controlsStack.width = "180px";
+    this.controlsStack.isVertical = true;
+    this.controlsStack.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_RIGHT;
+    this.controlsStack.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    this.controlsStack.paddingTop = "16px";
+    this.controlsStack.paddingRight = "16px";
+    this.controlsStack.spacing = 8;
+    this.controlsStack.isPointerBlocker = false;
+    this.controlsStack.isHitTestVisible = false;
+    gui.addControl(this.controlsStack);
 
     this.moveButton = this.createButton("Move", () => this.setMode("move"));
     this.placeButton = this.createButton("Place", () => this.setMode("place"));
@@ -46,10 +47,10 @@ export class PlayerControls {
     this.paletteGrid = this.createColorPalette();
     this.paletteGrid.isVisible = false;
 
-    controlsStack.addControl(this.moveButton);
-    controlsStack.addControl(this.placeButton);
-    controlsStack.addControl(this.removeButton);
-    controlsStack.addControl(this.paletteGrid);
+    this.controlsStack.addControl(this.moveButton);
+    this.controlsStack.addControl(this.placeButton);
+    this.controlsStack.addControl(this.removeButton);
+    this.controlsStack.addControl(this.paletteGrid);
 
     this.updateButtonStates();
     const scoreboardStack = new StackPanel();
@@ -66,6 +67,10 @@ export class PlayerControls {
     scoreboardStack.isHitTestVisible = false;
     gui.addControl(scoreboardStack);
     scoreboardStack.addControl(this.scoreboardButton);
+  }
+
+  getContainer() {
+    return this.controlsStack;
   }
 
   getMode() {

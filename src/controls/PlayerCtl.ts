@@ -60,6 +60,8 @@ export class PlayerCtl extends Player {
     "DRAWING_SCOUT_SPECIAL_DISTANCE_MULTIPLIER",
     3
   );
+  private readonly thomasSpeedMultiplier = 1.5;
+  private thomasApplied = false;
   private readonly defaultSpawnClass = this.getEnvString("DEFAULT_SPAWN_CLASS", "none");
   private scoutApplied = false;
   private baseColor: Color3;
@@ -158,8 +160,9 @@ export class PlayerCtl extends Player {
     const now = performance.now();
     const speedMultiplier = now < this.speedBoostUntilMs ? this.speedBoostMultiplier : 1;
     const scoutMultiplier = this.scoutApplied ? this.scoutSpeedMultiplier : 1;
+    const thomasMultiplier = this.thomasApplied ? this.thomasSpeedMultiplier : 1;
     const moveDistance = Math.min(
-      this.baseMaxSpeed * scoutMultiplier * speedMultiplier * deltaSeconds,
+      this.baseMaxSpeed * scoutMultiplier * thomasMultiplier * speedMultiplier * deltaSeconds,
       distance
     );
     const nextPosition = this.mesh.position.add(direction.scale(moveDistance));
@@ -277,10 +280,17 @@ export class PlayerCtl extends Player {
     if (template.name === "scout") {
       this.applyScoutBoost();
       this.currentClass = "scout";
+      this.thomasApplied = false;
     }
     if (template.name === "engineer" || template.name === "soldier") {
       this.resetScoutBoost(template.name);
       this.currentClass = template.name;
+      this.thomasApplied = false;
+    }
+    if (template.name === "thomas") {
+      this.resetScoutBoost("none");
+      this.applyThomasBoost();
+      this.currentClass = "thomas";
     }
     for (let row = 0; row < template.height; row++) {
       for (let col = 0; col < template.width; col++) {
@@ -337,19 +347,32 @@ export class PlayerCtl extends Player {
     if (normalized === "scout") {
       this.applyScoutBoost();
       this.currentClass = "scout";
+      this.thomasApplied = false;
+      return;
+    }
+    if (normalized === "thomas") {
+      this.resetScoutBoost("none");
+      this.applyThomasBoost();
+      this.currentClass = "thomas";
       return;
     }
     if (normalized === "engineer" || normalized === "soldier" || normalized === "none") {
       this.resetScoutBoost(normalized);
       this.currentClass = normalized;
+      this.thomasApplied = false;
       return;
     }
     this.resetScoutBoost("none");
     this.currentClass = "none";
+    this.thomasApplied = false;
   }
 
   getCurrentClass() {
     return this.currentClass;
+  }
+
+  private applyThomasBoost() {
+    this.thomasApplied = true;
   }
 
   private getEnvNumber(key: string, fallback: number) {

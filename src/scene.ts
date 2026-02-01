@@ -9,7 +9,8 @@ import {
   HemisphericLight,
   PointerEventTypes,
   LinesMesh,
-  Mesh
+  Mesh,
+  SpriteManager
 } from "babylonjs";
 import { Obstacle } from "./models/Obstacle";
 import { Player } from "./models/Player";
@@ -19,10 +20,16 @@ import { GameUI, PlayerMode } from "./ui/gameUI";
 import { colyseusConnection, MatchStatusCode } from "./connection";
 import { PlayerFactory } from "./factory/PlayerFactory";
 import { PaletteColor, colorToPaletteId } from "./drawingTemplates/palette";
+import thomasSpriteUrl from "./assets/thomas.jpg";
 
 export function createScene(canvas: HTMLCanvasElement): Scene {
-  const engine = new Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true });
+  const engine = new Engine(canvas, true, {
+    preserveDrawingBuffer: true,
+    stencil: true,
+    audioEngine: true
+  });
   const scene = new Scene(engine);
+  scene.audioEnabled = true;
 
   const camera = new ArcRotateCamera("camera", Math.PI / 2, Math.PI / 6, 36, Vector3.Zero(), scene);
   camera.inputs.clear();
@@ -36,6 +43,34 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
 
   const light = new HemisphericLight("hemisphericLight", new Vector3(0, 1, 0), scene);
   light.intensity = 0.95;
+
+  const getEnvNumber = (raw: string | undefined, fallback: number) => {
+    if (raw === undefined) {
+      return fallback;
+    }
+    const match = String(raw).match(/-?\d+(\.\d+)?/);
+    if (!match) {
+      return fallback;
+    }
+    const parsed = Number(match[0]);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  };
+
+  const thomasSpriteWidth = getEnvNumber(process.env.THOMAS_SPRITE_WIDTH, 350);
+  const thomasSpriteHeight = getEnvNumber(process.env.THOMAS_SPRITE_HEIGHT, 350);
+  const thomasSpriteDisplayHeight = getEnvNumber(process.env.THOMAS_SPRITE_DISPLAY_HEIGHT, 2.5);
+  const resolvedThomasSpriteUrl =
+    process.env.THOMAS_SPRITE_URL ||
+    thomasSpriteUrl ||
+    `${window.location.origin}/assets/thomas.jpg`;
+  const thomasSpriteManager = new SpriteManager(
+    "thomasSprites",
+    resolvedThomasSpriteUrl,
+    100,
+    { width: thomasSpriteWidth, height: thomasSpriteHeight },
+    scene
+  );
+  thomasSpriteManager.isPickable = false;
 
   const ground = MeshBuilder.CreateGround(
     "ground",
@@ -82,6 +117,24 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
   const cameraOffset = camera.position.subtract(player.mesh.position);
   const ui = new GameUI(scene, colyseusConnection);
   ui.attachPlayerMesh(player.mesh);
+  const applyLocalClassVisuals = (className: string) => {
+    if (className === "thomas") {
+      player.setThomasActive(
+        true,
+        thomasSpriteManager,
+        {
+          pixelWidth: thomasSpriteWidth,
+          pixelHeight: thomasSpriteHeight,
+          displayHeight: thomasSpriteDisplayHeight
+        }
+      );
+      ui.setCombatButtonsVisible(false);
+      return;
+    }
+    player.setThomasActive(false);
+    ui.setCombatButtonsVisible(true);
+  };
+  applyLocalClassVisuals(player.getCurrentClass());
   const placedCubes = new Map<string, { cube: ColorCube; colorId: PaletteColor }>();
   let pendingPlacement: { position: Vector3; color: Color3 } | null = null;
   let pendingRemoval: { position: Vector3 } | null = null;
@@ -90,17 +143,6 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
   let localPlayerId = "";
   let currentMode: PlayerMode = ui.getMode();
   let matchPaused = colyseusConnection.isMatchPaused();
-  const getEnvNumber = (raw: string | undefined, fallback: number) => {
-    if (raw === undefined) {
-      return fallback;
-    }
-    const match = String(raw).match(/-?\d+(\.\d+)?/);
-    if (!match) {
-      return fallback;
-    }
-    const parsed = Number(match[0]);
-    return Number.isFinite(parsed) ? parsed : fallback;
-  };
 
   let lastQuickAttackAt = 0;
   let nextQuickAttackReadyAt = 0;
@@ -147,8 +189,9 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
     5
   );
   const soldierSpecialDamage = getEnvNumber(process.env.SOLDIER_SPECIAL_DAMAGE, 90);
+  const spawnRadius = getEnvNumber(process.env.SPAWN_RADIUS, 2);
   const getRandomSpawnPosition = () => {
-    const range = 2;
+    const range = spawnRadius;
     const x = Math.round((Math.random() * 2 - 1) * range);
     const z = Math.round((Math.random() * 2 - 1) * range);
     return new Vector3(x, player.mesh.position.y, z);
@@ -337,7 +380,18 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
       return remotePlayers.get(id) ?? null;
     }
     const remote = new Player(playerFactory, id, false);
-    if (className) {
+    if (className === "thomas") {
+      remote.setClassName("thomas");
+      remote.setThomasActive(
+        true,
+        thomasSpriteManager,
+        {
+          pixelWidth: thomasSpriteWidth,
+          pixelHeight: thomasSpriteHeight,
+          displayHeight: thomasSpriteDisplayHeight
+        }
+      );
+    } else if (className) {
       remote.setClassColor(className);
     }
     remote.setPosition(getRandomSpawnPosition());
@@ -364,6 +418,20 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
     if (!remote) {
       return;
     }
+    if (className === "thomas") {
+      remote.setClassName("thomas");
+      remote.setThomasActive(
+        true,
+        thomasSpriteManager,
+        {
+          pixelWidth: thomasSpriteWidth,
+          pixelHeight: thomasSpriteHeight,
+          displayHeight: thomasSpriteDisplayHeight
+        }
+      );
+      return;
+    }
+    remote.setThomasActive(false);
     remote.setClassColor(className);
   });
 
@@ -380,6 +448,7 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
     if (!remote) {
       return;
     }
+    remote.setThomasActive(false);
     remote.mesh.dispose();
     remotePlayers.delete(id);
     ui.removeRemotePlayerLabel(id);
@@ -515,6 +584,11 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
       player.setHealth(health);
       player.setInvincibleForSeconds(player.getDamageCooldownTime());
       player.setPosition(getRandomSpawnPosition());
+      if (player.getCurrentClass() === "thomas") {
+        player.applySpawnClass("none");
+        applyLocalClassVisuals("none");
+        colyseusConnection.sendPlayerClass({ className: "none" });
+      }
       if (towerActive) {
         despawnEngineerTower(undefined, true);
       }
@@ -522,6 +596,10 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
       const remote = remotePlayers.get(id);
       if (remote) {
         remote.setPosition(getRandomSpawnPosition());
+        if (remote.getClassName() === "thomas") {
+          remote.setThomasActive(false);
+          remote.setClassColor("none");
+        }
       }
       const blocks = remoteEngineerTowers.get(id);
       if (blocks) {
@@ -587,6 +665,7 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
     placedCubes.set(key, { cube, colorId });
     const matched = player.checkDrawingsAt(pendingPlacement.position);
     if (matched && matched !== "redbull") {
+      applyLocalClassVisuals(player.getCurrentClass());
       colyseusConnection.sendPlayerClass({ className: player.getCurrentClass() });
     }
     colyseusConnection.sendPlaceCube({
@@ -833,6 +912,35 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
     for (const remote of remotePlayers.values()) {
       remote.updateInvincibility();
     }
+    if (!player.isInvincible()) {
+      for (const remote of remotePlayers.values()) {
+        if (remote.getClassName() !== "thomas") {
+          continue;
+        }
+        if (remote.mesh.intersectsMesh(player.mesh, false)) {
+          const damage = player.getQuickAttackDamage();
+          const applied = player.applyDamage(damage);
+          if (applied > 0) {
+            ui.updatePlayerHealth(localPlayerId, player.getHealth(), 100);
+            colyseusConnection.sendPlayerHealthUpdate({
+              id: localPlayerId,
+              health: player.getHealth()
+            });
+            colyseusConnection.sendPlayerHit({ id: localPlayerId });
+            colyseusConnection.sendAddPlayerScore({
+              id: remote.id,
+              amount: applied
+            });
+            if (player.getDamageCooldownTime() > 0) {
+              player.setInvincibleForSeconds(player.getDamageCooldownTime());
+            }
+            if (player.getHealth() <= 0) {
+              colyseusConnection.sendRespawn({ id: localPlayerId });
+            }
+          }
+        }
+      }
+    }
     if (!quickAttackEnabled && now >= nextQuickAttackReadyAt) {
       quickAttackEnabled = true;
       ui.setQuickAttackEnabled(true);
@@ -992,6 +1100,10 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
       y: player.mesh.position.y,
       z: player.mesh.position.z
     });
+    player.updateThomasSpritePosition();
+    for (const remote of remotePlayers.values()) {
+      remote.updateThomasSpritePosition();
+    }
     ui.updateDebugInfo(colyseusConnection, {
       x: player.mesh.position.x,
       z: player.mesh.position.z

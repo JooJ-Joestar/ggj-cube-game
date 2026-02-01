@@ -15,7 +15,7 @@ export class PlayerHealthBar {
     this.container.background = "rgba(0, 0, 0, 0.6)";
     this.container.isPointerBlocker = false;
     this.container.isHitTestVisible = false;
-    this.container.linkOffsetY = -45;
+    this.container.linkOffsetY = -75;
     this.container.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
     this.container.verticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
 
