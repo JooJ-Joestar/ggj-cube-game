@@ -4,6 +4,7 @@ export class PlayerAttacks {
   private readonly container: StackPanel;
   private readonly quickAttackButton: Button;
   private readonly specialButton: Button;
+  private readonly dismantleButton: Button;
   private readonly quickAttackEnabledColor = "rgba(173, 216, 230, 1)";
   private readonly quickAttackDisabledColor = "rgba(140, 140, 140, 0.8)";
   private readonly specialEnabledColor = "rgba(173, 216, 230, 1)";
@@ -12,6 +13,7 @@ export class PlayerAttacks {
   private specialReady = true;
   public onQuickAttack: () => void = () => {};
   public onSpecial: () => void = () => {};
+  public onDismantle: () => void = () => {};
 
   constructor(gui: AdvancedDynamicTexture) {
     this.container = new StackPanel();
@@ -36,8 +38,12 @@ export class PlayerAttacks {
       () => this.specialReady
     );
 
+    this.dismantleButton = this.createButton("Dismantle Tower", () => this.onDismantle());
+    this.dismantleButton.isVisible = false;
+
     this.container.addControl(this.quickAttackButton);
     this.container.addControl(this.specialButton);
+    this.container.addControl(this.dismantleButton);
   }
 
   setQuickAttackEnabled(enabled: boolean) {
@@ -50,6 +56,12 @@ export class PlayerAttacks {
   setSpecialEnabled(enabled: boolean) {
     this.specialReady = enabled;
     this.specialButton.background = enabled ? this.specialEnabledColor : this.specialDisabledColor;
+  }
+
+  setTowerMode(active: boolean) {
+    this.quickAttackButton.isVisible = !active;
+    this.specialButton.isVisible = !active;
+    this.dismantleButton.isVisible = active;
   }
 
   private createButton(text: string, handler: () => void, canActivate?: () => boolean) {

@@ -23,6 +23,7 @@ export class GameUI {
   public onModeChange: (mode: PlayerMode) => void = () => {};
   public onQuickAttack: () => void = () => {};
   public onSpecial: () => void = () => {};
+  public onDismantleTower: () => void = () => {};
 
   constructor(scene: Scene, connection: ColyseusConnection) {
     this.gui = AdvancedDynamicTexture.CreateFullscreenUI("game-ui", true, scene as any);
@@ -64,6 +65,7 @@ export class GameUI {
     this.attacks = new PlayerAttacks(this.gui);
     this.attacks.onQuickAttack = () => this.onQuickAttack();
     this.attacks.onSpecial = () => this.onSpecial();
+    this.attacks.onDismantle = () => this.onDismantleTower();
   }
 
   getMode() {
@@ -108,6 +110,10 @@ export class GameUI {
 
   setSpecialEnabled(enabled: boolean) {
     this.attacks.setSpecialEnabled(enabled);
+  }
+
+  setTowerMode(active: boolean) {
+    this.attacks.setTowerMode(active);
   }
 
   attachRemotePlayerLabel(id: string, name: string, mesh: Mesh) {

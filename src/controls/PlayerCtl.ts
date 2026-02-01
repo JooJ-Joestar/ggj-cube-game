@@ -72,6 +72,7 @@ export class PlayerCtl extends Player {
   private destinationCallback: ((position: Vector3) => void) | null = null;
   private lastMoveDirection = new Vector3(0, 0, 1);
   private drawingAccess: DrawingAccess | null = null;
+  private movementEnabled = true;
 
   constructor(factory: PlayerFactory, obstacles: Obstacle[], id = "") {
     super(factory, id, true);
@@ -100,6 +101,9 @@ export class PlayerCtl extends Player {
   }
 
   setTarget(point: Vector3) {
+    if (!this.movementEnabled) {
+      return;
+    }
     const snappedPoint = point.clone();
     snappedPoint.x = Math.round(snappedPoint.x);
     snappedPoint.z = Math.round(snappedPoint.z);
@@ -124,6 +128,9 @@ export class PlayerCtl extends Player {
 
   update(deltaSeconds: number) {
     if (colyseusConnection.shouldPauseUpdates()) {
+      return;
+    }
+    if (!this.movementEnabled) {
       return;
     }
     if (colyseusConnection.isMatchPaused()) {
@@ -170,6 +177,13 @@ export class PlayerCtl extends Player {
     this.pathPoints = [];
     this.currentSegmentIndex = 0;
     this.clearPathLine();
+  }
+
+  setMovementEnabled(enabled: boolean) {
+    this.movementEnabled = enabled;
+    if (!enabled) {
+      this.stopMovement();
+    }
   }
 
   getFacingDirection() {
