@@ -143,6 +143,7 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
     const attack = MeshBuilder.CreateBox("quickAttack", { size }, scene);
     attack.position = position.clone();
     attack.position.y = size / 2;
+    attack.renderingGroupId = 1;
     projectiles.push({
       mesh: attack,
       direction,
@@ -169,6 +170,7 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
     const material = new StandardMaterial("soldierSpecialMat", scene);
     material.diffuseColor = new Color3(1, 0, 0);
     attack.material = material;
+    attack.renderingGroupId = 1;
     projectiles.push({
       mesh: attack,
       direction,
@@ -189,6 +191,7 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
       const mat = new StandardMaterial(`debris-mat-${i}`, scene);
       mat.diffuseColor = new Color3(1, 0.5, 0.1);
       shard.material = mat;
+      shard.renderingGroupId = 1;
       const velocity = new Vector3(
         (Math.random() * 2 - 1) * 6,
         Math.random() * 6 + 4,
@@ -212,6 +215,7 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
     mat.diffuseColor = new Color3(1, 0.2, 0);
     mat.alpha = 0.3;
     explosion.material = mat;
+    explosion.renderingGroupId = 1;
     setTimeout(() => explosion.dispose(), 200);
     spawnExplosionDebris(center);
 
